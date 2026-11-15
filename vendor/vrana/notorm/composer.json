@@ -1,0 +1,55 @@
+{
+	"name": "vrana/notorm",
+	"description": "NotORM is a PHP library for simple working with data in the database.",
+	"keywords": ["database", "dbal"],
+	"homepage": "https://www.notorm.com/",
+	"support": {
+		"issues": "https://github.com/vrana/notorm/issues",
+		"source": "https://github.com/vrana/notorm/"
+	},
+	"license": ["Apache-2.0", "GPL-2.0-or-later"],
+	"authors": [
+		{
+			"name": "Jakub Vrána",
+			"homepage": "https://www.vrana.cz/"
+		}
+	],
+	"require": {
+		"php": ">=8.0",
+		"ext-pdo": "*"
+	},
+	"require-dev": {
+		"squizlabs/php_codesniffer": "4.0.4",
+		"slevomat/coding-standard": "8.31.1",
+		"phpstan/phpstan": "2.3.1",
+		"phpstan/phpstan-strict-rules": "2.1.0"
+	},
+	"suggest": {
+		"ext-apcu": "Needed by NotORM\\Cache\\APCu",
+		"ext-memcache": "Needed by NotORM\\Cache\\Memcache",
+		"ext-memcached": "Needed by NotORM\\Cache\\Memcached",
+		"ext-session": "Needed by NotORM\\Cache\\Session"
+	},
+	"autoload": {
+		"psr-4": {
+			"NotORM\\": "NotORM/"
+		}
+	},
+	"config": {
+		"lock": false,
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	},
+	"scripts": {
+		"check": [
+			"phpcs",
+			"phpstan analyse -c phpstan.neon"
+		],
+		"test": "@php tests/run-tests.php"
+	},
+	"scripts-descriptions": {
+		"check": "Checks the code by phpcs and phpstan",
+		"test": "Runs the tests in tests/ on MySQL, SQLite and PostgreSQL, or on one of them by e.g.: composer test sqlite"
+	}
+}

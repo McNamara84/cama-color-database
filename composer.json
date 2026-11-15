@@ -1,0 +1,44 @@
+{
+  "name": "cama/color-database",
+  "description": "CAMA Color Database – shared-hosting compatible application foundation",
+  "type": "project",
+  "license": "GPL-3.0-only",
+  "require": {
+    "php": "~8.5.0",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "ext-mbstring": "*",
+    "ext-intl": "*",
+    "ext-session": "*",
+    "slim/slim": "^4.15",
+    "slim/psr7": "^1.8",
+    "slim/twig-view": "^3.4",
+    "vrana/notorm": "^2.1.1",
+    "symfony/validator": "^7.4",
+    "vlucas/phpdotenv": "^5.6",
+    "monolog/monolog": "^3.9",
+    "robmorgan/phinx": "^0.16"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^12.5",
+    "phpstan/phpstan": "^2.1",
+    "friendsofphp/php-cs-fixer": "^3.90"
+  },
+  "autoload": {"psr-4": {"Cama\\": "src/"}},
+  "autoload-dev": {"psr-4": {"Cama\\Tests\\": "tests/"}},
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {},
+    "platform": {"php": "8.5.0"}
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:coverage": "phpunit --coverage-clover build/coverage.xml --coverage-html build/coverage --coverage-text",
+    "analyse": "phpstan analyse --memory-limit=512M",
+    "lint": "php-cs-fixer fix --dry-run --diff",
+    "format": "php-cs-fixer fix",
+    "check": ["@composer validate --strict", "@lint", "@analyse", "@test"],
+    "db:status": "phinx status -c phinx.php",
+    "db:migrate": "phinx migrate -c phinx.php"
+  }
+}

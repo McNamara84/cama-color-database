@@ -1,0 +1,164 @@
+<?php declare(strict_types=1);
+
+namespace NotORM;
+
+/** Representation of filtered table grouped by some column */
+class MultiResult extends Result {
+	/** @access protected must be public because it is called from Row */
+	function __construct(
+		string $table,
+		private Result $result,
+		private string $column,
+		private mixed $active,
+		?string $alias = null,
+	) {
+		parent::__construct($table, $result->notORM, alias: $alias);
+	}
+
+	/** Specify referencing column
+	* @return $this fluent interface
+	*/
+	function via(string $column): static {
+		$this->column = $column;
+		$this->conditions[0] = "$this->alias.$column AND";
+		$this->where[0] = "(" . $this->whereIn("$this->alias.$column", ($this->result->rows !== null ? $this->result->ids() : [$this->active])) . ")"; // rows are null after insert
+		return $this;
+	}
+
+	function insertMulti(array $rows): int|false {
+		$args = [];
+		foreach ($rows as $data) {
+			if ($data instanceof \Traversable && !$data instanceof Result) {
+				$data = iterator_to_array($data);
+			}
+			if (is_array($data)) {
+				$data[$this->column] = $this->active;
+			}
+			$args[] = $data;
+		}
+		return parent::insertMulti($args);
+	}
+
+	function insertUpdate(array $unique, array $insert, array $update = []): int|false {
+		$unique[$this->column] = $this->active;
+		return parent::insertUpdate($unique, $insert, $update);
+	}
+
+	protected function single(): void {
+		$this->where[0] = "($this->column = " . $this->quote($this->active) . ")";
+	}
+
+	function update(array $data): int|false {
+		$where = $this->where;
+		$this->single();
+		$return = parent::update($data);
+		$this->where = $where;
+		return $return;
+	}
+
+	function delete(): int|false {
+		$where = $this->where;
+		$this->single();
+		$return = parent::delete();
+		$this->where = $where;
+		return $return;
+	}
+
+	function select(string|Literal $columns, string|Literal ...$moreColumns): static {
+		if (!$this->select && !array_intersect([$columns, ...$moreColumns], [$this->column, "$this->alias.$this->column"])) { // MS SQL doesn't allow ORDER BY a column selected twice
+			return parent::select("$this->alias.$this->column", $columns, ...$moreColumns);
+		}
+		return parent::select($columns, ...$moreColumns);
+	}
+
+	function order(string|Literal|array $columns, string|Literal ...$moreColumns): static {
+		$column = '~^(' . preg_quote("$this->alias.") . ')?' . preg_quote($this->column) . '(\s+(ASC|DESC))?$~i';
+		if (!$this->order && !preg_grep($column, (is_array($columns) ? $columns : [$columns, ...$moreColumns]))) { // improve index utilization, MS SQL doesn't allow ORDER BY a column twice
+			$this->order[] = "$this->alias.$this->column" . (preg_match('~\\bDESC$~i', (is_array($columns) ? implode(", ", $columns) : (string) $columns)) ? " DESC" : "");
+		}
+		return parent::order($columns, ...$moreColumns);
+	}
+
+	function group(string|Literal $columns, string|Literal $having = ""): static {
+		if ($columns != "") { // group separately for each row of the referenced table
+			$columns = "$this->alias.$this->column, $columns";
+		}
+		return parent::group($columns, $having);
+	}
+
+	function aggregation(string $function): string|int|float|null {
+		if ($this->union || $this->group || isset($this->limit)) { // aggregate the rows of the whole query
+			$derived = $this->limited()->derived();
+			$query = "SELECT $function, $this->column FROM ($derived) t GROUP BY $this->column";
+			$parameters = $derived->queryParameters();
+		} else {
+			$join = $this->createJoins(implode(",", $this->conditions) . ",$function");
+			$column = ($join ? "$this->alias." : "") . $this->column;
+			$query = "SELECT $function, $column FROM " . $this->tableAlias($this->table, $this->alias) . implode($join);
+			if ($this->where) {
+				$query .= " WHERE " . implode($this->where);
+			}
+			$query .= " GROUP BY $column";
+			$parameters = $this->parameters;
+		}
+		$aggregation = &$this->result->aggregation[$query];
+		if (!isset($aggregation)) {
+			$aggregation = [];
+			$result = $this->query($query, $parameters);
+			if ($result) {
+				$result->setFetchMode(\PDO::FETCH_ASSOC);
+				foreach ($result as $row) {
+					$aggregation[$row[$this->column]] = $row;
+				}
+			}
+		}
+		foreach ($aggregation[$this->active] ?? [] as $return) {
+			return $return;
+		}
+		return null;
+	}
+
+	/** Get the query with LIMIT for each row of the referenced table */
+	protected function limited(): self {
+		if (!$this->limit || count($this->result->rows ?? []) <= 1 || $this->union) { // rows are null after insert
+			return $this;
+		}
+		//! doesn't work with union
+		$return = clone $this;
+		$first = true;
+		foreach ($this->result->rows ?? [] as $val) {
+			if ($first) {
+				$return->where[0] = "$this->column = " . $this->quote($val);
+				$first = false;
+			} else {
+				$clone = clone $this;
+				$clone->where[0] = "$this->column = " . $this->quote($val);
+				$return->union($clone, true); // the parts don't overlap, UNION would compare all columns, which Oracle doesn't support for BLOB
+			}
+		}
+		return $return;
+	}
+
+	protected function execute(): void {
+		if (!isset($this->rows)) {
+			$referencing = &$this->result->referencing[$this->__toString()];
+			if (!isset($referencing)) {
+				$limited = $this->limited();
+				if ($limited === $this) {
+					parent::execute();
+				} else {
+					$limited->execute();
+					$this->rows = $limited->rows;
+				}
+				$referencing = [];
+				foreach ($this->rows as $row) {
+					$referencing[$row[$this->column]][] = $row;
+				}
+				$referencing = array_map(fn ($rows) => $this->index($rows), $referencing);
+				$this->data = null; // all rows from parent::execute()
+			}
+			$this->data ??= $referencing[$this->active] ?? []; // a copy, the pointer of each instance is separate
+		}
+	}
+
+}

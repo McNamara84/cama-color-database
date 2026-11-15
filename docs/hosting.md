@@ -1,11 +1,11 @@
 # Hostingabgleich: Netcup Webhosting 2000
 
-Stand: 15. November 2026. Das Paket ist laut Projektvorgabe vorhanden. Es liegen noch keine WCP-/SSH-Befunde oder Zugangsdaten vor. Die folgende lokale Referenz ist deshalb **keine bestätigte Produktionskonfiguration**.
+Stand: 15. November 2026. Der Nutzer bestätigt die eingerichtete Subdomain `cama.cats4future.de`, verfügbaren SSH-Zugang und PHP 8.5. Der Screenshot zeigt die Plesk-Git-Anbindung und den bisherigen Zielpfad `/cama.cats4future.de/httpdocs`. Eine technische Prüfung auf dem Hosting steht noch aus; die lokale Referenz ist deshalb **keine vollständig bestätigte Produktionskonfiguration**.
 
 | Merkmal | Lokale Referenz / Anforderung | Vorhandenes Paket |
 | --- | --- | --- |
 | Tarifgeneration | Webhosting 2000 | Offen |
-| PHP | 8.5.12; Composer-Plattform 8.5.0 | Offen |
+| PHP | 8.5.12; Composer-Plattform 8.5.0 | PHP 8.5 verfügbar, Patchstand offen |
 | CLI | Passende PHP-8.5-Version, 64 Bit, absoluter Pfad | Offen |
 | Erweiterungen | PDO, pdo_mysql, mbstring, intl, session; Composer prüft weitere transitive Anforderungen | Offen |
 | Datenbank | MariaDB 10.11.19, InnoDB, utf8mb4_unicode_ci | Typ und Version offen |
@@ -13,13 +13,14 @@ Stand: 15. November 2026. Das Paket ist laut Projektvorgabe vorhanden. Es liegen
 | Speicher/Laufzeit | PHP lokal 256 MiB / 30 s | Offen |
 | Document-Root | Nur `current/public` | Konfigurierbarkeit und Chroot-Pfad offen |
 | Routing | Apache-Rewrite / `.htaccess` | Offen |
-| SSH | Schlüsselanmeldung, verifizierter Hostschlüssel | Offen |
-| Deploymentwerkzeuge | tar, sha256sum, PHP-CLI mit proc_open, symlink und rename | Offen |
+| Git-Anbindung | Plesk zieht den fertigen Branch `deploy` von GitHub | Dialog im Panel vorhanden; Deploy-Key und Webhook einzurichten |
+| SSH | Optional zur Diagnose; kein CI-Upload | Zugang laut Nutzer eingerichtet |
+| Deploymentwerkzeuge | PHP-8.5-CLI mit proc_open, flock, symlink und rename; zusätzliche Plesk-Bereitstellungsaktionen | Auf echtem Hosting zu prüfen |
 | HTTP-Prüfung vom Hosting | HTTPS-Dateizugriff über PHP (`allow_url_fopen`), funktionierende CA-Zertifikate | Offen |
 | Releasewechsel | Atomarer Symlinkwechsel; Web-PHP/OPcache erkennt neues Release | Offen |
 | Persistente Dateien | `shared/.env`, schreibbares `shared/var` außerhalb der öffentlichen Wurzel | Offen |
 | Datenbankrechte | DML für Anwendung; Schema-Rechte für Migrationen, soweit getrennt verfügbar | Offen |
-| Zieladresse | Eigene Domain/Subdomain, HTTPS, Betrieb am Domain-Wurzelpfad | Offen |
+| Zieladresse | Eigene Domain/Subdomain, HTTPS, Betrieb am Domain-Wurzelpfad | `cama.cats4future.de` eingerichtet; HTTPS-Aufruf noch zu prüfen |
 | Backup/Restore | Eigener geprüfter Export-/Restoreablauf | Offen |
 
 Die aktuelle [Netcup-Produktbeschreibung](https://www.netcup.com/de/hosting/webhosting/webhosting-2000-nue) bestätigt grundsätzlich PHP, SSH und einen anpassbaren Document-Root. Diese Angaben ersetzen den Abgleich des vorhandenen Vertrags nicht.

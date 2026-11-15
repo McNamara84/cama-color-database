@@ -1,60 +1,131 @@
-# Bereitstellung und Wiederherstellung
+# Bereitstellung über Netcup / Plesk Git
 
-## Freischaltung
+Ziel: **https://cama.cats4future.de**, vorhandenes Webhosting 2000. PHP 8.5, Subdomain und SSH-Zugang sind laut Nutzer vorhanden. Die Git-Anbindung im Webhostingpanel übernimmt den Download; GitHub Actions braucht keinen SSH-Zugang zum Hosting. Die tatsächliche Erstbereitstellung steht noch aus.
 
-CI läuft bei Pull Requests und Pushes auf `main`. Ein veröffentlichtes GitHub-Release oder ein manueller Aufruf des Deployment-Workflows wählt einen vorhandenen Tag. Der Commit muss von `main` erreichbar sein. Der wiederverwendete CI-Workflow prüft genau diesen Commit, baut das Paket und prüft das Paket erneut ohne Entwicklungsabhängigkeiten.
+## Ablauf
 
-Produktionsdeployments bleiben durch die Repositoryvariable `NETCUP_DEPLOY_ENABLED` ausgeschaltet, bis der [Hostingabgleich](hosting.md) abgeschlossen ist. Nach Einrichtung wird sie auf `true` gesetzt. Es wurden in dieser Umsetzung keine GitHub-Secrets, Environments oder Netcup-Einstellungen geändert.
+1. Ein offener Pull Request nach `main` führt ausschließlich die CI-Prüfungen aus.
+2. Nach einem PR-Merge oder direkten Push auf `main` laufen dieselben Prüfungen. CI baut ein Produktionspaket inklusive `vendor/`, testet es ohne Entwicklungsabhängigkeiten und speichert es als Artefakt.
+3. Nur nach erfolgreicher CI veröffentlicht der Deploymentjob genau dieses Artefakt auf dem Branch **`deploy`**. Er prüft vorher, ob der getestete Commit noch der aktuelle `main`-Stand ist. Überholte Läufe werden übersprungen; Veröffentlichungen laufen nacheinander und verwenden keinen Force-Push.
+4. CI ruft den HTTPS-Webhook des Plesk-Git-Repositories auf. Plesk zieht `deploy` und kopiert dessen Dateien in den vorbereiteten Ordner `deploy/` auf dem Hosting.
+5. Die zusätzliche Bereitstellungsaktion importiert anhand des SHA-256-Manifests ein vollständiges Release, prüft PHP-Plattform, Datenbank und Migrationsstatus und schaltet erst dann `current` um. Fehler beim HTTPS-Test stellen den vorherigen Link wieder her.
+6. Auch CI wartet darauf, dass `/health` exakt die erwartete Commit-ID meldet und die Startseite erreichbar ist. Ein angenommener Webhook allein gilt nicht als erfolgreicher Live-Test.
 
-Das Workflow-Environment heißt `production`. GitHub muss Environments für das betreffende Repository unterstützen; andernfalls ist die Environment-Zeile vor Aktivierung zu entfernen und die Konfiguration als Repository-Secrets/-Variablen zu hinterlegen. [GitHub: Verfügbarkeit von Environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+`deploy` ist ein automatisch erzeugter Veröffentlichungsbranch. Dort nicht entwickeln, keine PRs zurück nach `main` erstellen und keine manuellen Änderungen ablegen. Der Branch enthält Produktionsabhängigkeiten, keine `.env`, Tests, Dockerdateien, Workflows oder Implementierungspläne. Plesk muss **`deploy`** auswählen: Ein direktes Ausrollen von `main` würde die CI-Prüfungen umgehen und keine Composer-Abhängigkeiten enthalten.
 
-| Art | Name | Inhalt |
-| --- | --- | --- |
-| Secret | `NETCUP_SSH_KEY` | Privater Deploy-Schlüssel, dessen öffentlicher Teil auf Netcup eingerichtet ist |
-| Secret | `NETCUP_KNOWN_HOSTS` | Separat verifizierter OpenSSH-Hostschlüsseleintrag; kein ungeprüftes Laufzeit-ssh-keyscan |
-| Secret | `NETCUP_HOST` | SSH-Hostname oder IPv4-Adresse |
-| Secret | `NETCUP_USER` | SSH-Benutzer |
-| Variable | `NETCUP_PATH` | Absoluter kanonischer Pfad zum Anwendungsverzeichnis im SSH-Kontext |
-| Variable | `NETCUP_PHP` | Absoluter Pfad zur passenden PHP-CLI |
-| Variable | `NETCUP_ORIGIN` | HTTPS-Origin ohne abschließenden Schrägstrich oder Unterpfad |
+## 1. GitHub vorbereiten und den Branch erzeugen
 
-Der Transport verwendet SSH-Port 22. Pfade mit Leerzeichen und IPv6-Literale werden vom einfachen Transportskript derzeit nicht unterstützt. Zielparameter werden vor Verwendung im Remote-Shellbefehl validiert. GitHub Actions sind auf feste Commit-IDs gepinnt; Pull-Request-Checks erhalten keine Produktionszugänge. Ein neuer Deploy-Lauf bricht einen laufenden nicht ab.
+Die Änderungen an den Workflows zunächst auf `main` pushen. Unter [Settings → Secrets and variables → Actions → Variables](https://github.com/McNamara84/cama-color-database/settings/variables/actions) die Repositoryvariable **`NETCUP_DEPLOY_ENABLED` = `true`** anlegen. Anschließend unter **Actions → CI → Run workflow → main** einen Lauf starten, falls der Push bereits davor lief.
 
-## Einmalige Vorbereitung auf Netcup
+Beim ersten Lauf darf `PLESK_WEBHOOK_URL` noch fehlen: Die CI erzeugt dann nur den geprüften Branch `deploy` und weist in der Zusammenfassung auf die ausstehende Hosting-Einrichtung hin. Sie behauptet in diesem Zustand keinen erfolgreichen Live-Deploy. Bei ausgeschalteter oder fehlender Variable wird auch der Branch nicht veröffentlicht.
 
-Unter dem bestätigten Anwendungspfad folgende Struktur anlegen:
+Nur der Deploymentjob erhält `contents: write`; der Testjob erhält Leserechte. Der Job verwendet den kurzlebigen `GITHUB_TOKEN`, keinen persönlichen Zugriffstoken. Repositoryregeln müssen diesem Job das Schreiben auf `deploy` erlauben. Der Schutz von `main` bleibt bestehen. Ein kostenpflichtiges GitHub-Environment ist nicht erforderlich.
+
+## 2. Den Dialog aus dem Screenshot ausfüllen
+
+| Feld | Wert |
+| --- | --- |
+| Code-Speicherort | **Remote-Repository** |
+| Repository-URL | `git@github.com:McNamara84/cama-color-database.git` |
+| Repository-Name | `cama.git` |
+| Bereitstellungsmodus beim Einrichten | **Deaktiviert** |
+| Serverpfad | **`/cama.cats4future.de/deploy`** |
+| Zusätzliche Bereitstellungsaktionen | Nach Vorbereitung wie unten beschrieben aktivieren |
+
+Der Serverpfad bezeichnet den Ordner, in den Plesk Git-Dateien kopiert. Er ist nicht der öffentliche Document-Root. Der im Screenshot vorgeschlagene Ordner `httpdocs` wird bei diesem Aufbau nicht verwendet; vorhandene Inhalte dort werden nicht verändert.
+
+Bei Eingabe der SSH-URL zeigt Plesk einen öffentlichen SSH-Schlüssel. Diesen unter [GitHub → Settings → Deploy keys](https://github.com/McNamara84/cama-color-database/settings/keys) als `Netcup CAMA read-only` hinzufügen. **Allow write access ausgeschaltet lassen.** Der private Schlüssel verbleibt bei Plesk. Danach das Repository erstellen. Nach dem ersten erfolgreichen CI-Lauf in Plesk **Updates abrufen / Pull Updates** und unter **Branch und Pfad ändern** den Branch **`deploy`** wählen.
+
+Die SSH-Authentifizierung für private Repositories, Branchwahl und zusätzlichen Aktionen sind in der [Plesk-Dokumentation](https://docs.plesk.com/en-US/obsidian/administrator-guide/website-management/git-support/using-remote-git-hosting.75848/) beschrieben.
+
+## 3. Dateien, Datenbank und öffentliche Wurzel vorbereiten
+
+Im Dateimanager des Hostingpanels unter `cama.cats4future.de` die Verzeichnisse `shared` und `shared/var` anlegen. Eine eigene Datenbank für CAMA samt Benutzer im Hostingpanel erstellen. [production.env.example](production.env.example) als **`shared/.env`** speichern und die Platzhalter durch die Hosting-Datenbankzugänge ersetzen. Diese Datei nicht ins Git-Repository einchecken oder in den Chat kopieren. Dateirechte `0600`; `shared/var` muss für Web-PHP und CLI schreibbar sein.
+
+`APP_RUNTIME_DIR` in dieser Konfiguration weglassen: Cache, Sessions und Logs werden automatisch in `var` neben der tatsächlichen `.env` gespeichert. Relative Konfigurationslinks funktionieren auch, wenn CLI und Web-PHP unterschiedliche Chroot-Pfade sehen. Docker-Ports, Root-Passwort und lokale Testzugänge werden nicht übernommen. Falls der Tarif keine getrennten Datenbankbenutzer zulässt, können die beiden Benutzer-/Passwortpaare denselben bereitgestellten Datenbankzugang verwenden; dies im Hostingabgleich vermerken.
+
+Die spätere Struktur lautet:
 
 ```text
-application/
-  releases/
+cama.cats4future.de/
+  deploy/                     ← Plesk-Git-Ziel, nicht öffentlich
+    RELEASE
+    MANIFEST.sha256
+    vendor/
+    bin/plesk-deploy.php
+    ...
   shared/
-    .env
-    var/
-  current -> releases/<vollständige-commit-id>
+    .env                      ← nur auf dem Hosting
+    var/                      ← Cache, Sessions, Logs
+  releases/
+    <vollständige-main-sha>/   ← verifizierte, unveränderte Laufzeitdateien
+  current -> releases/<sha>
 ```
 
-`shared/.env` enthält `APP_ENV=production`, `APP_DEBUG=false`, den Projektnamen, den absoluten Pfad von `shared/var` als `APP_RUNTIME_DIR`, die echten `DB_*`-Werte und die getrennten `DB_MIGRATION_*`-Zugänge. `DB_ROOT_PASSWORD`, Testzugänge und Docker-Ports werden dort nicht benötigt. Die Konfiguration mit restriktiven Dateirechten außerhalb des Document-Roots ablegen. `shared/var` enthält Cache, Sessions und Logs; es muss für Web-PHP und die Deployment-CLI schreibbar sein. Das Hostingpanel auf `application/current/public` konfigurieren.
+Die Subdomain auf **PHP 8.5**, HTTPS mit gültigem Zertifikat und Document-Root **`/cama.cats4future.de/current/public`** einstellen. `.htaccess`/Rewrite müssen aktiv sein. Die genaue Schreibweise des Document-Roots kann im Panel relativ ohne führenden Schrägstrich erscheinen.
 
-## Paket und Aktivierung
-
-Ein Paket kann lokal mit einem vollständigen Git-Commit als Kennung gebaut und geprüft werden:
+`current` muss ein symbolischer Link sein, kein normales Verzeichnis. Falls das Panel vor dem Speichern einen existierenden Document-Root verlangt, einmalig über die vorhandene SSH-Shell einen Platzhalter vorbereiten. Die folgenden Befehle setzen den im Screenshot sichtbaren Chroot-Pfad voraus; bei abweichendem Shellpfad diesen anpassen:
 
 ```sh
-docker compose run --rm php sh bin/package "$(git rev-parse HEAD)"
-docker compose run --rm --build package-test
+cd /cama.cats4future.de
+mkdir -p releases/bootstrap/public
+test ! -e current && test ! -L current && ln -s releases/bootstrap current
 ```
 
-`build/release.tar.gz` enthält eine explizite Auswahl der Laufzeitdateien, frisch aus `composer.lock` installierte Produktionsabhängigkeiten, das Composer-PHAR zur Plattformprüfung und eine `RELEASE`-Datei. Lokale Konfiguration, Tests, Docker, phpMyAdmin und der Implementierungsplan werden nicht mitgeliefert. Das Archiv verwendet normalisierte Dateizeiten und Eigentümer; die SHA-256-Prüfsumme wird separat gespeichert.
+Ein vorhandenes `current` dabei nicht löschen oder überschreiben. Beim ersten erfolgreichen Deployment ersetzt die Anwendung den Platzhalterlink. Dafür sind keine Root-Rechte erforderlich. Das Verzeichnis `current` niemals vom Dateimanager als echten Ordner anlegen lassen.
 
-`bin/deploy` überträgt das Archiv per SSH/SCP, prüft die Prüfsumme und entpackt in ein neues Releaseverzeichnis. Ein bereits vorhandener Stand wird nur erneut verwendet, wenn dessen gespeicherte Archivprüfsumme übereinstimmt. Ein fehlgeschlagener Transfer oder eine unvollständige Extraktion verändert das aktive Release nicht; ein unvollständiges Zielverzeichnis wird vor einem erneuten Versuch nach Prüfung separat entfernt.
+## 4. Zusätzliche Bereitstellungsaktion eintragen
 
-`bin/activate.php` sperrt parallele Aktivierungen, bindet die vorhandene `.env` an und prüft Konfiguration, Datenbankverbindung, Verzeichnisrechte, Plattformanforderungen und Phinx-Status. Es führt **keine automatischen Schemaänderungen** aus. Ausstehende oder im Paket fehlende Migrationen stoppen das Deployment. Im Grundgerüst gibt es noch keine Fachmigrationen; beim späteren Einführen ist der kompatible Migrationsablauf ausdrücklich zu ergänzen.
+Den absoluten PHP-8.5-CLI-Pfad in der Hosting-Shell prüfen, beispielsweise:
 
-Danach wird `current` atomar auf das neue Release gesetzt. Ein HTTPS-Test muss die erwartete Release-ID und eine funktionierende Startseite liefern; damit wird auch ein veralteter OPcache-Stand erkannt. Schlägt die Prüfung fehl, wird der vorherige Link wiederhergestellt. Bei einem fehlgeschlagenen allerersten Deployment gibt es anschließend keinen aktiven Link. Der Workflow meldet den Fehler.
+```sh
+/usr/local/php85/bin/php -v
+```
 
-Ein Wiederholungsaufruf desselben Tags durchläuft die Prüfungen erneut. Das Paket muss bytegleich sein, wenn das Releaseverzeichnis bereits vorhanden ist. Die Migrationen dürfen keinen abweichenden Stand voraussetzen. Eine neue Konfiguration kann mit demselben Release geprüft werden, ohne Secrets in das Archiv zu schreiben.
+Dies ist der anhand des Netcup-Schemas erwartete Pfad, noch kein Befund des konkreten Pakets. Die [Netcup-Dokumentation zu PHP in der Shell](https://www.netcup.com/en/helpcenter/documentation/web-hosting/php-shell) beschreibt versionsspezifische Pfade und weist darauf hin, dass ein bloßes `php` eine andere Standardversion verwenden kann. Der sichtbare Artikel listet derzeit nur Versionen bis 8.4; PHP 8.5 wurde vom Nutzer im Panel bestätigt.
+
+Unter **Zusätzliche Bereitstellungsaktionen aktivieren** folgende einzelne Zeile mit dem verifizierten PHP- und Chroot-Pfad eintragen:
+
+```sh
+/usr/local/php85/bin/php /cama.cats4future.de/deploy/bin/plesk-deploy.php https://cama.cats4future.de
+```
+
+Das Skript leitet das Basisverzeichnis aus seinem eigenen Speicherort ab; ein bestimmtes Arbeitsverzeichnis ist nicht erforderlich. Es benötigt `proc_open`, Dateisperren, symbolische Links und HTTPS-Zugriff mit gültigen CA-Zertifikaten. `open_basedir` muss `deploy`, `releases` und `shared` innerhalb dieses Anwendungsverzeichnisses zulassen. Ein Fehler ist im Plesk-Bereitstellungsprotokoll sichtbar. Auf dem Hosting werden weder Composer-Pakete heruntergeladen noch Docker, Node.js oder Root benötigt.
+
+Für einen ersten kontrollierten Versuch den Modus **Manuell** wählen und den Branch `deploy` bereitstellen. Bei erfolgreichem Aufruf von `https://cama.cats4future.de/health` muss `release` den getesteten `main`-Commit enthalten. Danach den Bereitstellungsmodus auf **Automatisch** umstellen.
+
+## 5. Automatische Benachrichtigung einschalten
+
+In den Einstellungen des Plesk-Git-Repositories die erzeugte **Webhook-URL** kopieren. Die vollständige HTTPS-URL unter [GitHub → Actions secrets](https://github.com/McNamara84/cama-color-database/settings/secrets/actions) als Repository-Secret **`PLESK_WEBHOOK_URL`** speichern. Sie enthält einen Zugangstoken; nicht öffentlich dokumentieren. HTTPS-Zertifikatsprüfung bleibt eingeschaltet, HTTP-URLs und Weiterleitungen werden abgelehnt.
+
+**Keinen zusätzlichen GitHub-Push-Webhook einrichten.** In diesem Projekt benachrichtigt ausschließlich der erfolgreiche CI-Deploymentjob Plesk. Die Plesk-Webhook-URL ist dafür der Endpunkt; die automatische GitHub-Webhook-Einrichtung aus allgemeinen Plesk-Anleitungen ist hier nicht nötig.
+
+Erneut **Actions → CI → Run workflow → main** ausführen. Danach lösen PR-Merges und direkte Pushes nach `main` die komplette Kette aus. Bei einer Wiederholung desselben Pakets bleibt der Branch-Commit unverändert; Plesk wird trotzdem erneut benachrichtigt. Ein veralteter Lauf wird übersprungen. Falls ein neuerer `main`-Commit fehlschlägt, bleibt der zuletzt veröffentlichte Stand aktiv.
+
+Die vorhandene GitHub-Anbindung des Assistenten kann Repositorydateien lesen und bearbeiten, aber keine Actions-Secrets oder Netcup-Panel-Einstellungen setzen. Diese einmaligen Einstellungen sind deshalb im jeweiligen Panel vorzunehmen.
+
+## Lokale Prüfung und Fehlerdiagnose
+
+```sh
+docker compose build test
+docker compose run --rm test composer check
+docker compose run --rm test composer test:coverage
+docker compose run --rm test php bin/check-coverage.php
+docker compose run --rm php sh bin/package "$(git rev-parse HEAD)"
+docker compose run --rm --build package-test
+docker compose run --rm test bash tests/plesk-publish-smoke.sh
+docker compose run --rm test bash tests/plesk-notify-smoke.sh
+```
+
+Die Git-Tests verwenden ein echtes lokales Bare-Repository, keine GitHub-Schreibzugänge. Webhooktests simulieren HTTP-Antworten einschließlich Fehlern und falscher Release-ID. Pakettests importieren das vollständige Produktionspaket und prüfen die Anwendung ohne Entwicklungsabhängigkeiten. Der End-to-End-Nachweis mit echtem Plesk ist erst nach der Panel-Einrichtung möglich.
+
+Bei einem fehlgeschlagenen Lauf zuerst die CI-Zusammenfassung und das Plesk-Git-Bereitstellungsprotokoll prüfen. Ein fehlender Deploy-Key führt zum Git-Fehler; eine fehlende oder falsche `shared/.env` stoppt vor Aktivierung; eine falsche PHP-CLI oder ausstehende Migrationen stoppen beim Preflight. HTTPS-, Document-Root- oder OPcache-Probleme führen zu fehlgeschlagener Releaseprüfung und Rückfall auf den vorherigen Stand. Bei Fehlern nach Veröffentlichung des Branches kann derselbe CI-Lauf erneut gestartet werden.
+
+`bin/deploy` bleibt als separat getesteter manueller SSH/SCP-Transport erhalten, wird vom Plesk-Workflow aber nicht verwendet. Die früheren `NETCUP_SSH_KEY`, `NETCUP_KNOWN_HOSTS`, `NETCUP_HOST`, `NETCUP_USER`, `NETCUP_PATH`, `NETCUP_PHP` und `NETCUP_ORIGIN` werden für diesen Workflow nicht benötigt.
 
 ## Migrationen, Backups und Rollback
+
+Die Aktivierung führt keine automatischen Schemaänderungen aus. Ausstehende oder im Paket fehlende Migrationen stoppen das Deployment. Im Grundgerüst gibt es noch keine Fachmigrationen; beim Einführen von Tabellen ist ein kompatibler Migrationsablauf zu ergänzen.
 
 Vor Schemaänderungen einen aktuellen Datenbankexport sichern und die Wiederherstellung in einer separaten Datenbank erproben. Neue Migrationen müssen während des Releasewechsels mit dem alten und neuen Anwendungscode kompatibel sein. Änderungen mit Ausfallzeit oder Datenverlust gehören in einen eigenen Wartungsablauf. Datenbankrechte und DDL-Verhalten sind auf dem vorhandenen Hosting zu prüfen.
 
@@ -64,4 +135,4 @@ Bei einem notwendigen Datenrestore Schreibzugriffe im Hosting vorübergehend spe
 
 Alte Releaseverzeichnisse werden vorerst bewusst manuell aufgeräumt: mindestens aktives und vorheriges erfolgreiches Release behalten; zusätzlich vor dem Entfernen prüfen, ob sie für Rollback oder Datenmigrationen gebraucht werden. `shared/` darf dabei nicht entfernt werden. Der aktive Cache ist nach Releasepfad getrennt; nicht mehr verwendete Cacheverzeichnisse können gemeinsam mit alten Releases aufgeräumt werden.
 
-Die automatisierten Tests prüfen den lokalen Dateisystemwechsel und seine Fehlerpfade sowie das Produktionspaket. SSH-Anmeldung, Netcup-Chroot, reale Hostschlüssel und Web-PHP/OPcache auf dem vorhandenen Paket können erst mit der eingerichteten Zielumgebung verifiziert werden.
+Die automatisierten Tests prüfen den lokalen Dateisystemwechsel und seine Fehlerpfade sowie das Produktionspaket. Die Plesk-Git-Anbindung, der Netcup-Chroot und Web-PHP/OPcache auf dem vorhandenen Paket können erst mit der eingerichteten Zielumgebung verifiziert werden.

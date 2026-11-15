@@ -59,7 +59,9 @@ Enthalten sind eine Startseite, Health-Endpunkt, sichere Fehlerseiten, zentrale 
 
 Twig bildet die Oberfläche. HTMX wird erst mit der ersten dynamischen Fachfunktion eingebunden, einschließlich Fehlerdarstellung für HTTP 422 und normaler HTML-Fallbacks. Die fachlichen Tabellen und die Suche mit mehr als 100.000 Einträgen bleiben einem eigenen Entwicklungsschritt vorbehalten.
 
-Die Laufzeit ist vorläufig auf **PHP 8.5.12 und MariaDB 10.11.19** eingestellt. Offizielle Container werden per Digest fixiert; Composer-Abhängigkeiten sind in `composer.lock` festgeschrieben. Die Übereinstimmung mit dem vorhandenen Netcup-Paket ist noch offen und muss vor dem ersten Produktivdeployment bestätigt werden. Eine Änderung der PHP-Version umfasst Docker-Basis, Composer-PHP-Vorgabe, Lockdatei und erneute Tests; für die Datenbank müssen auch Initialisierung und SQL-Verhalten geprüft werden.
+Die lokale Laufzeit verwendet **PHP 8.5.12 und MariaDB 10.11.19**. PHP 8.5 ist laut Hostingpanel verfügbar; Patchstand, CLI-Pfad und Datenbankversion müssen vor dem ersten Deployment abgeglichen werden. Offizielle Container werden per Digest fixiert; Composer-Abhängigkeiten sind in `composer.lock` festgeschrieben. Eine Änderung der PHP-Version umfasst Docker-Basis, Composer-PHP-Vorgabe, Lockdatei und erneute Tests; für die Datenbank müssen auch Initialisierung und SQL-Verhalten geprüft werden.
+
+Die Bereitstellung für **https://cama.cats4future.de** verwendet die Git-Anbindung des Netcup-/Plesk-Panels. Nach erfolgreichen Tests eines Pushes oder PR-Merges nach `main` schreibt CI das fertige Paket samt Produktionsabhängigkeiten auf den Branch `deploy` und benachrichtigt Plesk. Offene PRs veröffentlichen nichts. Die einmalige Einrichtung und Freischaltung stehen in der [Deploymentanleitung](docs/deployment.md); ein Hosting-Upgrade ist dafür nicht vorgesehen.
 
 Weitere Dokumentation: [Entwicklung](docs/development.md), [Hostingabgleich](docs/hosting.md), [Deployment und Wiederherstellung](docs/deployment.md), [Changelog](CHANGELOG.md).
 

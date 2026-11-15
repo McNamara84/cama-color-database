@@ -1,0 +1,56 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+release_id=${1:?Usage: bin/publish-plesk FULL_GIT_SHA}
+[[ $release_id =~ ^[a-f0-9]{40}$ ]] || { echo 'Invalid release ID.' >&2; exit 1; }
+report() {
+    echo "published=$1"
+    if [[ -n ${GITHUB_OUTPUT:-} ]]; then echo "published=$1" >> "$GITHUB_OUTPUT"; fi
+}
+is_current() {
+    local remote_main
+    remote_main=$(git ls-remote --exit-code origin refs/heads/main) || return 2
+    [[ ${remote_main%%$'\t'*} == "$release_id" ]]
+}
+check_current() {
+    local status=0
+    is_current || status=$?
+    if [[ $status == 1 ]]; then
+        echo 'A newer main commit exists; skipping this deployment.'
+        report false
+        exit 0
+    fi
+    [[ $status == 0 ]] || { echo 'Cannot verify remote main.' >&2; exit 1; }
+}
+check_current
+(cd build && sha256sum -c release.tar.gz.sha256)
+stage=$(mktemp -d)
+trap 'rm -rf "$stage"' EXIT
+mkdir "$stage/package"
+tar -xzf build/release.tar.gz -C "$stage/package"
+[[ $(cat "$stage/package/RELEASE") == "$release_id" ]] || { echo 'Package identity mismatch.' >&2; exit 1; }
+test -f "$stage/package/MANIFEST.sha256"
+(cd "$stage/package" && sha256sum -c MANIFEST.sha256 > /dev/null)
+# A separate index leaves the source checkout, its index and main untouched.
+export GIT_INDEX_FILE="$stage/index"
+git read-tree --empty
+git --work-tree="$stage/package" add --all --force -- .
+tree=$(git write-tree)
+parents=()
+status=0
+git ls-remote --exit-code origin refs/heads/deploy > /dev/null || status=$?
+if [[ $status == 0 ]]; then
+    git fetch --no-tags origin refs/heads/deploy
+    parent=$(git rev-parse FETCH_HEAD)
+    parents=(-p "$parent")
+elif [[ $status != 2 ]]; then
+    echo 'Cannot inspect deployment branch.' >&2
+    exit 1
+fi
+check_current
+if [[ ${#parents[@]} == 0 ]] || [[ $(git rev-parse "$parent^{tree}") != "$tree" ]]; then
+    commit=$(printf 'Deploy main %s\n' "$release_id" | git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit-tree "$tree" "${parents[@]}")
+    # Fast-forward only: concurrent or manually changed history must never be overwritten.
+    git push origin "$commit:refs/heads/deploy"
+fi
+report true

@@ -1,0 +1,26 @@
+#!/bin/bash
+set -euo pipefail
+release_id=${1:?Usage: bin/notify-plesk FULL_GIT_SHA}
+[[ $release_id =~ ^[a-f0-9]{40}$ ]] || { echo 'Invalid release ID.' >&2; exit 1; }
+: "${PLESK_WEBHOOK_URL:?Configure the Plesk HTTPS webhook as a repository secret.}"
+: "${DEPLOY_ORIGIN:?Configure the public HTTPS origin.}"
+[[ $PLESK_WEBHOOK_URL == https://* && $PLESK_WEBHOOK_URL != *$'\n'* && $PLESK_WEBHOOK_URL != *$'\r'* ]] || exit 1
+[[ $DEPLOY_ORIGIN =~ ^https://[a-zA-Z0-9.-]+(:[0-9]+)?$ ]] || exit 1
+# Never print the webhook URL or its response body: the URL contains its credential.
+status=$(curl --silent --output /dev/null --write-out '%{http_code}' --proto '=https' --connect-timeout 15 --max-time 120 \
+    --request POST --header 'Content-Type: application/json' --header 'X-GitHub-Event: push' \
+    --data '{"ref":"refs/heads/deploy"}' "$PLESK_WEBHOOK_URL") || { echo 'Plesk webhook request failed.' >&2; exit 1; }
+[[ $status =~ ^2[0-9][0-9]$ ]] || { echo 'Plesk webhook did not accept the request.' >&2; exit 1; }
+# Plesk may process the request asynchronously. Acknowledgement alone is not success.
+for ((attempt = 0; attempt < 30; attempt++)); do
+    if health=$(curl --silent --fail --proto '=https' --connect-timeout 5 --max-time 10 --header 'Cache-Control: no-cache' "$DEPLOY_ORIGIN/health?release=$release_id") &&
+        jq --exit-status --arg release "$release_id" '.status == "ok" and .release == $release' <<< "$health" > /dev/null &&
+        home=$(curl --silent --fail --proto '=https' --connect-timeout 5 --max-time 10 "$DEPLOY_ORIGIN/") &&
+        [[ $home == *'<!doctype html>'* ]]; then
+        echo "Release $release_id is live at $DEPLOY_ORIGIN."
+        exit 0
+    fi
+    sleep 5
+done
+echo 'The expected release did not become healthy. Check the Plesk deployment log.' >&2
+exit 1

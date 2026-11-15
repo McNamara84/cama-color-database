@@ -6,13 +6,14 @@ use Cama\Config\Settings;
 use Cama\Infrastructure\Database;
 use Cama\Infrastructure\ReleaseManager;
 use Cama\Infrastructure\Runtime;
+use Cama\Infrastructure\StagedRelease;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 // This CLI is never exposed through the public document root.
 try {
-    if (PHP_SAPI !== 'cli' || !isset($argv) || count($argv) !== 4) {
-        throw new RuntimeException('Usage: activate.php BASE FULL_GIT_SHA HTTPS_ORIGIN');
+    if (PHP_SAPI !== 'cli' || !isset($argv) || !in_array(count($argv), [4, 5], true)) {
+        throw new RuntimeException('Usage: activate.php BASE FULL_GIT_SHA HTTPS_ORIGIN [STAGING_DIRECTORY]');
     }
     [$script, $base, $id, $origin] = $argv;
     if (!str_starts_with($base, '/') || realpath($base) !== $base || !preg_match('~^https://[a-zA-Z0-9.-]+(?::[0-9]+)?$~D', $origin)) {
@@ -21,6 +22,9 @@ try {
     $lock = fopen($base . '/.deploy.lock', 'c');
     if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
         throw new RuntimeException('Another deployment is active.');
+    }
+    if (isset($argv[4])) {
+        (new StagedRelease())->install($argv[4], $base, $id);
     }
     $manager = new ReleaseManager();
     $release = $manager->prepare($base, $id);

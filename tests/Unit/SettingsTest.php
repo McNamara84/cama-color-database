@@ -96,6 +96,38 @@ final class SettingsTest extends TestCase
         rmdir($path);
     }
 
+    public function testSharedConfigurationDeterminesRuntimeWithoutHostSpecificAbsolutePaths(): void
+    {
+        $base = sys_get_temp_dir() . '/cama-shared-' . bin2hex(random_bytes(8));
+        mkdir($base . '/shared', 0755, true);
+        mkdir($base . '/release');
+        file_put_contents($base . '/shared/.env', '# Runtime is relative to this configuration file.');
+        symlink('../shared/.env', $base . '/release/.env');
+        $original = getenv('APP_RUNTIME_DIR');
+        $environment = $_ENV['APP_RUNTIME_DIR'] ?? null;
+        $server = $_SERVER['APP_RUNTIME_DIR'] ?? null;
+        putenv('APP_RUNTIME_DIR');
+        unset($_ENV['APP_RUNTIME_DIR'], $_SERVER['APP_RUNTIME_DIR']);
+        try {
+            self::assertSame($base . '/shared/var', Settings::load($base . '/release')->runtime);
+            putenv('APP_RUNTIME_DIR=' . $base . '/override');
+            self::assertSame($base . '/override', Settings::load($base . '/release')->runtime);
+        } finally {
+            $original === false ? putenv('APP_RUNTIME_DIR') : putenv('APP_RUNTIME_DIR=' . $original);
+            if ($environment !== null) {
+                $_ENV['APP_RUNTIME_DIR'] = $environment;
+            }
+            if ($server !== null) {
+                $_SERVER['APP_RUNTIME_DIR'] = $server;
+            }
+            unlink($base . '/release/.env');
+            unlink($base . '/shared/.env');
+            rmdir($base . '/release');
+            rmdir($base . '/shared');
+            rmdir($base);
+        }
+    }
+
     public function testInvalidRuntimePathFails(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'cama-');

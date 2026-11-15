@@ -4,6 +4,7 @@ parameters:
         - src
         - bin/doctor.php
         - bin/activate.php
+        - bin/plesk-deploy.php
         - bin/check-coverage.php
         - phinx.php
     tmpDir: var/phpstan

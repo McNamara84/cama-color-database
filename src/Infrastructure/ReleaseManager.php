@@ -28,13 +28,14 @@ final class ReleaseManager
         if (!is_file($base . '/shared/.env')) {
             throw new RuntimeException('Provision shared/.env before deployment.');
         }
-        if (is_link($release . '/.env') && readlink($release . '/.env') === $base . '/shared/.env') {
+        $configuration = '../../shared/.env';
+        if (is_link($release . '/.env') && in_array(readlink($release . '/.env'), [$configuration, $base . '/shared/.env'], true)) {
             return $release;
         }
         if (file_exists($release . '/.env') || is_link($release . '/.env')) {
             throw new RuntimeException('Release must not contain an environment file.');
         }
-        if (!@symlink($base . '/shared/.env', $release . '/.env')) {
+        if (!@symlink($configuration, $release . '/.env')) {
             throw new RuntimeException('Could not attach production configuration.');
         }
 

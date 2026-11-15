@@ -11,4 +11,5 @@ ENV COMPOSER_HOME=/tmp/cama-composer
 
 FROM runtime AS development
 RUN pecl install xdebug-3.5.3 && docker-php-ext-enable xdebug
+RUN apt-get update && apt-get install -y --no-install-recommends jq && rm -rf /var/lib/apt/lists/*
 ENV XDEBUG_MODE=off

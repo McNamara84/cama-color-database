@@ -46,7 +46,8 @@ final class ReleaseManagerTest extends TestCase
         $manager = new ReleaseManager();
         $release = $manager->prepare($this->base, $this->id);
         self::assertSame($release, $manager->prepare($this->base, $this->id));
-        self::assertSame($this->base . '/shared/.env', readlink($release . '/.env'));
+        self::assertSame('../../shared/.env', readlink($release . '/.env'));
+        self::assertSame($this->base . '/shared/.env', realpath($release . '/.env'));
         $manager->activate($this->base, $this->id, function (): bool {
             self::assertSame($this->id, file_get_contents($this->base . '/current/RELEASE'));
             return true;

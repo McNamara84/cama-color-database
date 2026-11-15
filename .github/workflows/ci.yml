@@ -3,15 +3,8 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_call:
-    inputs:
-      ref:
-        type: string
-        required: true
-    outputs:
-      sha:
-        description: Tested commit
-        value: ${{ jobs.check.outputs.sha }}
+    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -23,7 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - id: identity
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -54,6 +46,8 @@ jobs:
           docker compose run --rm php sh bin/package "$RELEASE_SHA"
           docker compose run --rm --build package-test
           docker compose run --rm test bash tests/transport-smoke.sh
+          docker compose run --rm test bash tests/plesk-publish-smoke.sh
+          docker compose run --rm test bash tests/plesk-notify-smoke.sh
       - name: Preserve coverage
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -75,3 +69,16 @@ jobs:
       - name: Stop project containers
         if: always()
         run: docker compose down
+  deploy:
+    needs: check
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      vars.NETCUP_DEPLOY_ENABLED == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      sha: ${{ needs.check.outputs.sha }}
+    secrets:
+      PLESK_WEBHOOK_URL: ${{ secrets.PLESK_WEBHOOK_URL }}

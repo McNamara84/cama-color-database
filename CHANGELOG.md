@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Geändert – 2026-11-15
+
+- Deployment über die Git-Anbindung im Netcup-/Plesk-Panel: Erfolgreich geprüfte Pushes und PR-Merges nach `main` veröffentlichen das fertige Produktionspaket auf `deploy`; offene PRs führen ausschließlich CI-Prüfungen aus.
+- Plesk-Pull per HTTPS-Webhook mit anschließender Prüfung der tatsächlich ausgelieferten Release-ID; Repository-Secret statt SSH-Zugangsdaten in GitHub Actions. Ein manueller CI-Lauf auf `main` ermöglicht Wiederholungen.
+- Schutz vor überholten CI-Läufen, Deployment ohne Force-Push, SHA-256-Manifest und atomarer Import aus dem Plesk-Zielordner vor dem bestehenden Releasewechsel mit Rollback.
+- Relative Verknüpfung der Hosting-Konfiguration und automatisch daraus abgeleiteter gemeinsamer Laufzeitordner für unterschiedliche Dateisystempfade in CLI und Web-PHP.
+- Tests für Plesk-Dateiimport, echte Git-Publikation gegen ein lokales Remote und simulierte Webhook-/HTTP-Fehler; Anleitung zur Einrichtung von `cama.cats4future.de` im Panel.
+
 ### Hinzugefügt – 2026-11-15
 
 - Technisches Grundgerüst der CAMA Color Database mit Slim 4, NotORM 2.1, Twig, validierter Konfiguration und datenbankunabhängiger Startseite.

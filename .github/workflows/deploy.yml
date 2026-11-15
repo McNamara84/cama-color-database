@@ -1,74 +1,48 @@
-name: Deploy to Netcup
+name: Deploy via Netcup Plesk Git
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      tag:
-        description: Existing release tag reachable from main
+      sha:
+        description: Main commit tested and packaged by the calling CI run
         required: true
         type: string
+    secrets:
+      PLESK_WEBHOOK_URL:
+        description: HTTPS webhook from the Plesk Git repository settings
+        required: false
 permissions:
-  contents: read
+  contents: write
 concurrency:
-  group: netcup-production
+  group: netcup-cama
   cancel-in-progress: false
 jobs:
-  resolve:
-    if: vars.NETCUP_DEPLOY_ENABLED == 'true'
-    runs-on: ubuntu-24.04
-    outputs:
-      sha: ${{ steps.ref.outputs.sha }}
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: ref
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
-        run: |
-          git check-ref-format "refs/tags/$RELEASE_TAG"
-          sha=$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")
-          git merge-base --is-ancestor "$sha" origin/main
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-  checks:
-    needs: resolve
-    uses: ./.github/workflows/ci.yml
-    with:
-      ref: ${{ needs.resolve.outputs.sha }}
   deploy:
-    needs: [resolve, checks]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    environment: production
+    timeout-minutes: 15
+    env:
+      PLESK_WEBHOOK_URL: ${{ secrets.PLESK_WEBHOOK_URL }}
+      RELEASE_SHA: ${{ inputs.sha }}
+      DEPLOY_ORIGIN: https://cama.cats4future.de
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ needs.checks.outputs.sha }}
-          persist-credentials: false
+          ref: ${{ inputs.sha }}
+          # Required only in this trusted main job to publish the deployment branch.
+          persist-credentials: true
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
-          name: release-${{ needs.checks.outputs.sha }}
+          name: release-${{ inputs.sha }}
           path: build
-      - name: Configure SSH
-        env:
-          DEPLOY_KEY: ${{ secrets.NETCUP_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.NETCUP_KNOWN_HOSTS }}
+      - name: Publish the verified package to the deploy branch
+        id: publish
+        run: bash bin/publish-plesk "$RELEASE_SHA"
+      - name: Explain first-time setup
+        if: steps.publish.outputs.published == 'true' && env.PLESK_WEBHOOK_URL == ''
         run: |
-          umask 077
-          mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-      - name: Upload and activate verified release
-        env:
-          DEPLOY_HOST: ${{ secrets.NETCUP_HOST }}
-          DEPLOY_USER: ${{ secrets.NETCUP_USER }}
-          DEPLOY_PATH: ${{ vars.NETCUP_PATH }}
-          DEPLOY_PHP: ${{ vars.NETCUP_PHP }}
-          DEPLOY_ORIGIN: ${{ vars.NETCUP_ORIGIN }}
-          RELEASE_SHA: ${{ needs.checks.outputs.sha }}
-        run: bash bin/deploy "$RELEASE_SHA"
-      - name: Remove SSH credentials
-        if: always()
-        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          echo 'Deploy branch prepared. Hosting deployment is pending Plesk setup and PLESK_WEBHOOK_URL.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Ask Plesk to pull and deploy
+        if: steps.publish.outputs.published == 'true' && env.PLESK_WEBHOOK_URL != ''
+        run: bash bin/notify-plesk "$RELEASE_SHA"

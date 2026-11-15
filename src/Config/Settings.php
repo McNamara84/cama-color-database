@@ -32,6 +32,11 @@ final readonly class Settings
                 $values[$key] = $value;
             }
         }
+        // Resolve shared storage within the current PHP filesystem view (CLI chroot or FPM).
+        $configuration = realpath($root . '/.env');
+        if (!isset($values['APP_RUNTIME_DIR']) && $configuration !== false) {
+            $values['APP_RUNTIME_DIR'] = dirname($configuration) . '/var';
+        }
         if ($migration) {
             $values['DB_USER'] = $values['DB_MIGRATION_USER'] ?? '';
             $values['DB_PASSWORD'] = $values['DB_MIGRATION_PASSWORD'] ?? '';

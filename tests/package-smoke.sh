@@ -17,6 +17,11 @@ done
 test -f "$stage/vendor/autoload.php"
 test -f "$stage/vendor/bin/phinx"
 test -f "$stage/bin/composer.phar"
+test -f "$stage/bin/plesk-deploy.php"
+(cd "$stage" && sha256sum -c MANIFEST.sha256 > /dev/null)
+# Exercise the Plesk file importer with the complete real production dependency tree.
+mkdir "$stage/hosting"
+php -r 'require $argv[1]."/vendor/autoload.php"; $id=trim(file_get_contents($argv[1]."/RELEASE")); $import=new Cama\Infrastructure\StagedRelease(); $release=$import->install($argv[1],$argv[1]."/hosting",$id); if($release!==$import->install($argv[1],$argv[1]."/hosting",$id)){exit(1);}' "$stage"
 APP_ENV=production APP_DEBUG=false APP_RUNTIME_DIR="$stage/var" php "$stage/bin/doctor.php"
 APP_ENV=production APP_DEBUG=false APP_RUNTIME_DIR="$stage/var" php -S 127.0.0.1:8099 -t "$stage/public" "$stage/public/index.php" > "$stage/server.log" 2>&1 &
 server_pid=$!

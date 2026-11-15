@@ -10,10 +10,11 @@ for item in src public templates migrations phinx.php composer.json composer.loc
     cp -R "$item" "$stage/"
 done
 mkdir "$stage/bin"
-cp bin/doctor.php bin/activate.php "$stage/bin/"
+cp bin/doctor.php bin/activate.php bin/plesk-deploy.php "$stage/bin/"
 printf '%s\n' "$release_id" > "$stage/RELEASE"
 composer install --working-dir="$stage" --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader --no-progress
 cp /usr/local/bin/composer "$stage/bin/composer.phar"
+(cd "$stage" && find . -type f ! -name MANIFEST.sha256 -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sed 's#  \./#  #') > "$stage/MANIFEST.sha256"
 find "$stage" -type d -exec chmod 755 {} +
 find "$stage" -type f -exec chmod 644 {} +
 tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$stage" -cf - . | gzip -n > build/release.tar.gz

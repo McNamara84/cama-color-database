@@ -7,7 +7,16 @@
     <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
-    <header><a href="/" class="brand"><span class="mark" aria-hidden="true"></span>{{ app_name }}</a></header>
+    <header><a href="/" class="brand"><span class="mark" aria-hidden="true"></span>{{ app_name }}</a>
+        <nav aria-label="Account">
+        {% if user %}
+            <span class="account-name">{{ user.name }}</span>
+            {% if user.isAdmin and not user.mustChangePassword %}<a href="/admin/users">Accounts</a>{% endif %}
+            <a href="/account/password">Passwort ändern</a>
+            <form action="/logout" method="post"><input type="hidden" name="_csrf" value="{{ csrf }}"><button class="link-button" type="submit">Abmelden</button></form>
+        {% else %}<a href="/login">Anmelden</a>{% endif %}
+        </nav>
+    </header>
     <main id="main">{% block content %}{% endblock %}</main>
     <footer>Farben. Wissen. Zusammenhänge.</footer>
 </body>

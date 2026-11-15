@@ -1,0 +1,15 @@
+{% extends 'layout.html.twig' %}
+{% block title %}Anmelden · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="account-panel">
+<p class="eyebrow">Dein Zugang</p><h1>Anmelden</h1>
+<p>Accounts werden vom Administrator angelegt.</p>
+{% include 'form-errors.html.twig' %}
+<form method="post" action="/login" class="account-form">
+    <input type="hidden" name="_csrf" value="{{ csrf }}">
+    <label for="email">E-Mail-Adresse</label><input id="email" name="email" type="email" autocomplete="username" maxlength="254" value="{{ email }}" required>
+    <label for="password">Passwort</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Anmelden</button>
+</form>
+</section>
+{% endblock %}

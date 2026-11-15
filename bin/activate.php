@@ -37,6 +37,7 @@ try {
     $commands = [
         [PHP_BINARY, $release . '/bin/composer.phar', 'check-platform-reqs', '--no-dev'],
         [PHP_BINARY, $release . '/vendor/bin/phinx', 'status', '-c', $release . '/phinx.php'],
+        [PHP_BINARY, $release . '/bin/install.php', '--bootstrap-only'],
     ];
     foreach ($commands as $command) {
         $process = proc_open($command, [STDIN, STDOUT, STDERR], $pipes, $release);

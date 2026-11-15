@@ -10,7 +10,7 @@ for item in src public templates migrations phinx.php composer.json composer.loc
     cp -R "$item" "$stage/"
 done
 mkdir "$stage/bin"
-cp bin/doctor.php bin/activate.php bin/plesk-deploy.php "$stage/bin/"
+cp bin/doctor.php bin/activate.php bin/plesk-deploy.php bin/install.php "$stage/bin/"
 printf '%s\n' "$release_id" > "$stage/RELEASE"
 composer install --working-dir="$stage" --no-dev --no-interaction --no-scripts --prefer-dist --optimize-autoloader --no-progress
 cp /usr/local/bin/composer "$stage/bin/composer.phar"

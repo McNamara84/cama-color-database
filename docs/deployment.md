@@ -130,7 +130,7 @@ Bei einem fehlgeschlagenen Lauf zuerst die CI-Zusammenfassung und das Plesk-Git-
 
 ## Migrationen, Backups und Rollback
 
-Die Aktivierung führt keine automatischen Schemaänderungen aus. Ausstehende oder im Paket fehlende Migrationen stoppen das Deployment. Im Grundgerüst gibt es noch keine Fachmigrationen; beim Einführen von Tabellen ist ein kompatibler Migrationsablauf zu ergänzen.
+Die Aktivierung führt keine automatischen Schemaänderungen aus. Ausstehende oder im Paket fehlende Migrationen stoppen das Deployment. Die Account-Erweiterung benötigt erstmals zwei Tabellen; die [Anleitung zur ersten Account-Bereitstellung](accounts.md#erste-bereitstellung-auf-netcup) beschreibt Datenbankexport, private Admin-Konfiguration, kontrollierte Installation und erneuten CI-Lauf. Nach erfolgreicher Schemaprüfung führt jede Aktivierung `bin/install.php --bootstrap-only` aus; vorhandene Adminzugänge bleiben dabei unverändert.
 
 Vor Schemaänderungen einen aktuellen Datenbankexport sichern und die Wiederherstellung in einer separaten Datenbank erproben. Neue Migrationen müssen während des Releasewechsels mit dem alten und neuen Anwendungscode kompatibel sein. Änderungen mit Ausfallzeit oder Datenverlust gehören in einen eigenen Wartungsablauf. Datenbankrechte und DDL-Verhalten sind auf dem vorhandenen Hosting zu prüfen.
 

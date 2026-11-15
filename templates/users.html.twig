@@ -1,0 +1,23 @@
+{% extends 'layout.html.twig' %}
+{% block title %}Accounts verwalten · {{ app_name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">Administration</p><h1>Accounts verwalten</h1>
+{% if created %}<p class="success" role="status">Der Account wurde angelegt. Gib der Person E-Mail-Adresse und Startpasswort über einen geschützten Weg weiter.</p>{% endif %}
+<section class="account-panel">
+<h2>Account anlegen</h2><p>Neue Accounts erhalten keine Adminrechte. Das Startpasswort muss beim ersten Login geändert werden.</p>
+{% include 'form-errors.html.twig' %}
+<form method="post" action="/admin/users" class="account-form">
+    <input type="hidden" name="_csrf" value="{{ csrf }}">
+    <label for="name">Name</label><input id="name" name="name" type="text" autocomplete="off" maxlength="100" value="{{ name }}" required>
+    <label for="email">E-Mail-Adresse</label><input id="email" name="email" type="email" autocomplete="off" maxlength="254" value="{{ email }}" required>
+    <label for="password">Startpasswort</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="15" maxlength="128" aria-describedby="password-help" required>
+    <p class="field-help" id="password-help">15 bis 128 Zeichen. Das Passwort wird nicht per E-Mail versendet.</p>
+    <label for="password-confirmation">Startpasswort wiederholen</label><input id="password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="15" maxlength="128" required>
+    <button type="submit">Account anlegen</button>
+</form>
+</section>
+<section class="account-list"><h2>Zuletzt angelegte Accounts</h2><p class="note">Die letzten 50 Accounts, neueste zuerst.</p>
+<div class="table-scroll"><table><thead><tr><th scope="col">Name</th><th scope="col">E-Mail-Adresse</th><th scope="col">Rolle</th></tr></thead><tbody>
+{% for account in accounts %}<tr><td>{{ account.name }}</td><td>{{ account.email }}</td><td>{{ account.is_admin ? 'Administrator' : 'Benutzer' }}</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

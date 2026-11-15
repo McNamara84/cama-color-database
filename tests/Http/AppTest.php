@@ -69,7 +69,7 @@ final class AppTest extends TestCase
         $app = AppFactory::create(TestSettings::create(['APP_ENV' => 'production']), new Logger('test', [$handler]));
         $app->get('/explode', static function (): never {
             throw new RuntimeException('password=supersecret');
-        });
+        })->setName('home');
         $response = $app->handle((new ServerRequestFactory())->createServerRequest('GET', '/explode?token=supersecret'));
         self::assertSame(500, $response->getStatusCode());
         self::assertStringNotContainsString('supersecret', (string) $response->getBody());
@@ -83,7 +83,7 @@ final class AppTest extends TestCase
         $app = AppFactory::create(TestSettings::create(['APP_ENV' => 'development', 'APP_DEBUG' => 'true']));
         $app->get('/explode', static function (): never {
             throw new RuntimeException('<script>failure</script>');
-        });
+        })->setName('home');
         $response = $app->handle((new ServerRequestFactory())->createServerRequest('GET', '/explode'));
         self::assertStringContainsString('&lt;script&gt;failure', (string) $response->getBody());
     }

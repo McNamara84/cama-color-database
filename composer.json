@@ -39,6 +39,7 @@
     "format": "php-cs-fixer fix",
     "check": ["@composer validate --strict", "@lint", "@analyse", "@test"],
     "db:status": "phinx status -c phinx.php",
-    "db:migrate": "phinx migrate -c phinx.php"
+    "db:migrate": "phinx migrate -c phinx.php",
+    "app:install": "php bin/install.php"
   }
 }

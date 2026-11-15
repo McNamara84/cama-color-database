@@ -101,4 +101,31 @@ final class SessionTest extends TestCase
         $this->expectException(\RuntimeException::class);
         (new Session('/does-not-exist/cama-sessions', true))->start();
     }
+
+    public function testIdleAndAbsoluteExpiryInvalidateIdentity(): void
+    {
+        $session = $this->session();
+        $session->login(42, 'credential', 1000);
+        self::assertSame(['id' => 42, 'credential' => 'credential'], $session->identity(1001));
+        self::assertNull($session->identity(1001 + Session::IDLE_SECONDS));
+        self::assertSame('', session_id());
+        $session->login(42, 'credential', 1000);
+        $_SESSION['seen'] = 1000 + Session::MAX_SECONDS - 1;
+        self::assertNull($session->identity(1000 + Session::MAX_SECONDS));
+        self::assertSame('', session_id());
+    }
+
+    public function testMalformedSessionIsInvalidatedAndLoginRotatesCsrf(): void
+    {
+        $session = $this->session();
+        $oldToken = $session->csrfToken();
+        $oldId = session_id();
+        $session->login(42, 'credential', 1000);
+        self::assertNotSame($oldToken, $session->csrfToken());
+        self::assertNotSame($oldId, session_id());
+        self::assertFileDoesNotExist(sys_get_temp_dir() . '/sess_' . $oldId);
+        $_SESSION['user_id'] = ['not-an-id'];
+        self::assertNull($session->identity(1001));
+        self::assertSame(PHP_SESSION_NONE, session_status());
+    }
 }

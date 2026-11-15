@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Cama;
 
 use Cama\Config\Settings;
+use Cama\Auth\Users;
+use Cama\Auth\Passwords;
+use Cama\Auth\LoginLimiter;
+use Cama\Http\AccountController;
+use Cama\Http\Authentication;
 use Cama\Http\Csrf;
 use Cama\Http\ErrorHandler;
 use Cama\Http\RequestContext;
@@ -12,6 +17,7 @@ use Cama\Http\RequestLimits;
 use Cama\Http\Session;
 use Cama\Http\WriteAccess;
 use Cama\Infrastructure\Runtime;
+use Cama\Infrastructure\Database;
 use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Logger;
@@ -38,16 +44,30 @@ final class AppFactory
             'strict_variables' => true,
         ]);
         $twig->getEnvironment()->addGlobal('app_name', $settings->name);
+        $twig->getEnvironment()->addGlobal('user', null);
+        $twig->getEnvironment()->addGlobal('csrf', '');
+        $session = new Session($settings->runtime . '/sessions', $settings->environment === 'production');
+        $database = new Database($settings->database);
+        $users = new Users($database);
+        $accounts = new AccountController($twig, $session, $users, new Passwords(), new LoginLimiter($database));
         $app = \Slim\Factory\AppFactory::create();
-        $app->map(['GET', 'HEAD'], '/', static fn (ServerRequestInterface $request, ResponseInterface $response): ResponseInterface => $twig->render($response, 'home.html.twig'));
+        $app->map(['GET', 'HEAD'], '/', $accounts->home(...))->setName('home');
+        $app->map(['GET', 'HEAD'], '/login', $accounts->login(...))->setName('login');
+        $app->post('/login', $accounts->login(...))->setName('login.submit');
+        $app->post('/logout', $accounts->logout(...))->setName('logout');
+        $app->map(['GET', 'HEAD'], '/account/password', $accounts->password(...))->setName('password');
+        $app->post('/account/password', $accounts->password(...))->setName('password.submit');
+        $app->map(['GET', 'HEAD'], '/admin/users', $accounts->users(...))->setName('admin.users');
+        $app->post('/admin/users', $accounts->users(...))->setName('admin.users.create');
         $app->map(['GET', 'HEAD'], '/health', static function (ServerRequestInterface $request, ResponseInterface $response) use ($settings): ResponseInterface {
             $file = $settings->root . '/RELEASE';
             $release = is_file($file) ? trim((string) file_get_contents($file)) : 'development';
             $response->getBody()->write(json_encode(['status' => 'ok', 'release' => $release], JSON_THROW_ON_ERROR));
 
             return $response->withHeader('Content-Type', 'application/json');
-        });
-        $app->add(new Csrf(new Session($settings->runtime . '/sessions', $settings->environment === 'production')));
+        })->setName('health');
+        $app->add(new Csrf($session));
+        $app->add(new Authentication($session, $users));
         $app->add(new WriteAccess());
         $app->addBodyParsingMiddleware();
         $app->addRoutingMiddleware();

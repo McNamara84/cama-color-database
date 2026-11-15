@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Behoben – 2026-11-15
+
+- Passwortfelder bei Anmeldung, Passwortwechsel und Accountanlage kürzen gültige Unicode-Passwörter nicht mehr durch das HTML-`maxlength`; die serverseitige Grenze bleibt bei 128 Unicode-Zeichen.
+
 ### Hinzugefügt – Accounts – 2026-11-15
 
 - Login und Logout mit CSRF-Schutz, erneuerten Session-IDs, Sitzungsablauf und Anmeldebegrenzung; Startseite bleibt öffentlich, Accountdaten sind geschützt.

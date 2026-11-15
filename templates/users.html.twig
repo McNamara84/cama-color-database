@@ -10,9 +10,9 @@
     <input type="hidden" name="_csrf" value="{{ csrf }}">
     <label for="name">Name</label><input id="name" name="name" type="text" autocomplete="off" maxlength="100" value="{{ name }}" required>
     <label for="email">E-Mail-Adresse</label><input id="email" name="email" type="email" autocomplete="off" maxlength="254" value="{{ email }}" required>
-    <label for="password">Startpasswort</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="15" maxlength="128" aria-describedby="password-help" required>
+    <label for="password">Startpasswort</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="15" aria-describedby="password-help" required>
     <p class="field-help" id="password-help">15 bis 128 Zeichen. Das Passwort wird nicht per E-Mail versendet.</p>
-    <label for="password-confirmation">Startpasswort wiederholen</label><input id="password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="15" maxlength="128" required>
+    <label for="password-confirmation">Startpasswort wiederholen</label><input id="password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="15" required>
     <button type="submit">Account anlegen</button>
 </form>
 </section>

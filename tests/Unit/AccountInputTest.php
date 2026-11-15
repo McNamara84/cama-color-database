@@ -18,6 +18,33 @@ final class AccountInputTest extends TestCase
         self::assertSame('user@example.org', AccountInput::email(' User@Example.org '));
     }
 
+    /** @return iterable<string, array{string, int}> */
+    public static function unicodePasswordLengths(): iterable
+    {
+        foreach (['login', 'create', 'password'] as $form) {
+            foreach ([100, 128, 129] as $length) {
+                yield $form . ' with ' . $length . ' emoji' => [$form, $length];
+            }
+        }
+    }
+
+    #[DataProvider('unicodePasswordLengths')]
+    public function testPasswordLimitsCountUnicodeCodePoints(string $form, int $length): void
+    {
+        $password = str_repeat('🎨', $length);
+        $input = $form === 'password' ? ['current_password' => $password] : ['email' => 'user@example.org'];
+        $input['password'] = $password;
+        if ($form !== 'login') {
+            $input['password_confirmation'] = $password;
+        }
+        if ($form === 'create') {
+            $input['name'] = 'Name';
+        }
+        $errors = (new AccountInput())->errors($input, $form);
+        $fields = $form === 'password' ? ['[current_password]', '[password]', '[password_confirmation]'] : ($form === 'create' ? ['[password]', '[password_confirmation]'] : ['[password]']);
+        self::assertSame($length > 128 ? $fields : [], array_column($errors, 'field'));
+    }
+
     /** @return iterable<string, array{mixed}> */
     public static function invalidInputs(): iterable
     {

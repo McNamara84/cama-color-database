@@ -1,6 +1,8 @@
 # Bereitstellung über Netcup / Plesk Git
 
-Ziel: **https://cama.cats4future.de**, vorhandenes Webhosting 2000. PHP 8.5, Subdomain und SSH-Zugang sind laut Nutzer vorhanden. Die Git-Anbindung im Webhostingpanel übernimmt den Download; GitHub Actions braucht keinen SSH-Zugang zum Hosting. Die tatsächliche Erstbereitstellung steht noch aus.
+Ziel: **https://cama.cats4future.de**, vorhandenes Webhosting 2000. Die Anwendung wurde am 15. November 2026 erfolgreich aktiviert und per HTTPS geprüft. CLI und Web-PHP verwenden 8.5.12; die Datenbank ist MySQL 8.4.13. Die Git-Anbindung im Webhostingpanel übernimmt den Download; GitHub Actions braucht keinen SSH-Zugang zum Hosting. Den konkreten Befund dokumentiert der [Hostingabgleich](hosting.md).
+
+Die vollständige Kette ist mit [CI-Lauf 43728179882](https://github.com/McNamara84/cama-color-database/actions/runs/43728179882) auf `main` bestätigt: Prüfungen und Veröffentlichung waren erfolgreich, der Webhook wurde um 15:10:43 UTC aufgerufen und Plesk aktivierte das Release um 15:10:46 UTC. Die anschließende externe HTTPS-Prüfung meldete `status: ok` und Release `2977ff838b730ed69e59abca78da8edf825362a2`. Die folgenden Einrichtungsschritte sind für dieses Hosting bereits abgeschlossen; weitere PR-Merges und direkte Pushes nach `main` verwenden denselben Ablauf.
 
 ## Ablauf
 
@@ -27,12 +29,12 @@ Nur der Deploymentjob erhält `contents: write`; der Testjob erhält Leserechte.
 | --- | --- |
 | Code-Speicherort | **Remote-Repository** |
 | Repository-URL | `git@github.com:McNamara84/cama-color-database.git` |
-| Repository-Name | `cama.git` |
+| Repository-Name | `cama-color-database.git` (tatsächlich angelegter Name) |
 | Bereitstellungsmodus beim Einrichten | **Deaktiviert** |
 | Serverpfad | **`/cama.cats4future.de/deploy`** |
 | Zusätzliche Bereitstellungsaktionen | Nach Vorbereitung wie unten beschrieben aktivieren |
 
-Der Serverpfad bezeichnet den Ordner, in den Plesk Git-Dateien kopiert. Er ist nicht der öffentliche Document-Root. Der im Screenshot vorgeschlagene Ordner `httpdocs` wird bei diesem Aufbau nicht verwendet; vorhandene Inhalte dort werden nicht verändert.
+Der Serverpfad bezeichnet den Ordner, in den Plesk Git-Dateien kopiert. Als Git-Ziel dient `deploy`; `httpdocs` bleibt die öffentliche Wurzel und wird wie in Schritt 3 beschrieben mit dem aktiven Release verknüpft. Vorhandene Inhalte wurden dabei gesichert.
 
 Bei Eingabe der SSH-URL zeigt Plesk einen öffentlichen SSH-Schlüssel. Diesen unter [GitHub → Settings → Deploy keys](https://github.com/McNamara84/cama-color-database/settings/keys) als `Netcup CAMA read-only` hinzufügen. **Allow write access ausgeschaltet lassen.** Der private Schlüssel verbleibt bei Plesk. Danach das Repository erstellen. Nach dem ersten erfolgreichen CI-Lauf in Plesk **Updates abrufen / Pull Updates** und unter **Branch und Pfad ändern** den Branch **`deploy`** wählen.
 
@@ -60,9 +62,12 @@ cama.cats4future.de/
   releases/
     <vollständige-main-sha>/   ← verifizierte, unveränderte Laufzeitdateien
   current -> releases/<sha>
+  httpdocs -> current/public   ← vorhandener Document-Root dieses Netcup-Pakets
 ```
 
-Die Subdomain auf **PHP 8.5**, HTTPS mit gültigem Zertifikat und Document-Root **`/cama.cats4future.de/current/public`** einstellen. `.htaccess`/Rewrite müssen aktiv sein. Die genaue Schreibweise des Document-Roots kann im Panel relativ ohne führenden Schrägstrich erscheinen.
+Die Subdomain auf **PHP 8.5**, HTTPS mit gültigem Zertifikat und einen ausschließlich auf `current/public` zeigenden Document-Root einstellen. Auf dem vorhandenen Paket wurde am 15. November 2026 der Link **`httpdocs -> current/public`** eingerichtet; im Panel kann deshalb **`/cama.cats4future.de/httpdocs`** bleiben. Die früheren Inhalte von `httpdocs` sind unter `shared/previous-httpdocs-20261115T144539Z` gesichert. `.htaccess`/Rewrite müssen aktiv sein.
+
+In den **PHP-Einstellungen → open_basedir** den zweiten Dropdown-Eintrag **beginnend mit `{WEBSPACEROOT}`** wählen und speichern. Der Standardwert mit `{DOCROOT}` ist für diesen Aufbau zu eng. Das vorhandene Netcup-Panel erlaubt hier keine freie Eingabe; eine `.user.ini` kann die Beschränkung nicht aufheben. Dieser Panel-Schritt benötigt keinen Root-Zugang.
 
 `current` muss ein symbolischer Link sein, kein normales Verzeichnis. Falls das Panel vor dem Speichern einen existierenden Document-Root verlangt, einmalig über die vorhandene SSH-Shell einen Platzhalter vorbereiten. Die folgenden Befehle setzen den im Screenshot sichtbaren Chroot-Pfad voraus; bei abweichendem Shellpfad diesen anpassen:
 
@@ -82,7 +87,7 @@ Den absoluten PHP-8.5-CLI-Pfad in der Hosting-Shell prüfen, beispielsweise:
 /usr/local/php85/bin/php -v
 ```
 
-Dies ist der anhand des Netcup-Schemas erwartete Pfad, noch kein Befund des konkreten Pakets. Die [Netcup-Dokumentation zu PHP in der Shell](https://www.netcup.com/en/helpcenter/documentation/web-hosting/php-shell) beschreibt versionsspezifische Pfade und weist darauf hin, dass ein bloßes `php` eine andere Standardversion verwenden kann. Der sichtbare Artikel listet derzeit nur Versionen bis 8.4; PHP 8.5 wurde vom Nutzer im Panel bestätigt.
+Dieser Pfad und PHP **8.5.12** sind auf dem konkreten Paket per SSH bestätigt; auch Web-PHP verwendet 8.5.12. Die [Netcup-Dokumentation zu PHP in der Shell](https://www.netcup.com/en/helpcenter/documentation/web-hosting/php-shell) beschreibt versionsspezifische Pfade und weist darauf hin, dass ein bloßes `php` eine andere Standardversion verwenden kann.
 
 Unter **Zusätzliche Bereitstellungsaktionen aktivieren** folgende einzelne Zeile mit dem verifizierten PHP- und Chroot-Pfad eintragen:
 
@@ -117,7 +122,7 @@ docker compose run --rm test bash tests/plesk-publish-smoke.sh
 docker compose run --rm test bash tests/plesk-notify-smoke.sh
 ```
 
-Die Git-Tests verwenden ein echtes lokales Bare-Repository, keine GitHub-Schreibzugänge. Webhooktests simulieren HTTP-Antworten einschließlich Fehlern und falscher Release-ID. Pakettests importieren das vollständige Produktionspaket und prüfen die Anwendung ohne Entwicklungsabhängigkeiten. Der End-to-End-Nachweis mit echtem Plesk ist erst nach der Panel-Einrichtung möglich.
+Die Git-Tests verwenden ein echtes lokales Bare-Repository, keine GitHub-Schreibzugänge. Webhooktests simulieren HTTP-Antworten einschließlich Fehlern und falscher Release-ID. Pakettests importieren das vollständige Produktionspaket und prüfen die Anwendung ohne Entwicklungsabhängigkeiten. Der oben verlinkte CI-Lauf und die anschließende Hostingprüfung bestätigen zusätzlich die vollständige Bereitstellung über das echte Plesk.
 
 Bei einem fehlgeschlagenen Lauf zuerst die CI-Zusammenfassung und das Plesk-Git-Bereitstellungsprotokoll prüfen. Ein fehlender Deploy-Key führt zum Git-Fehler; eine fehlende oder falsche `shared/.env` stoppt vor Aktivierung; eine falsche PHP-CLI oder ausstehende Migrationen stoppen beim Preflight. HTTPS-, Document-Root- oder OPcache-Probleme führen zu fehlgeschlagener Releaseprüfung und Rückfall auf den vorherigen Stand. Bei Fehlern nach Veröffentlichung des Branches kann derselbe CI-Lauf erneut gestartet werden.
 
@@ -135,4 +140,4 @@ Bei einem notwendigen Datenrestore Schreibzugriffe im Hosting vorübergehend spe
 
 Alte Releaseverzeichnisse werden vorerst bewusst manuell aufgeräumt: mindestens aktives und vorheriges erfolgreiches Release behalten; zusätzlich vor dem Entfernen prüfen, ob sie für Rollback oder Datenmigrationen gebraucht werden. `shared/` darf dabei nicht entfernt werden. Der aktive Cache ist nach Releasepfad getrennt; nicht mehr verwendete Cacheverzeichnisse können gemeinsam mit alten Releases aufgeräumt werden.
 
-Die automatisierten Tests prüfen den lokalen Dateisystemwechsel und seine Fehlerpfade sowie das Produktionspaket. Die Plesk-Git-Anbindung, der Netcup-Chroot und Web-PHP/OPcache auf dem vorhandenen Paket können erst mit der eingerichteten Zielumgebung verifiziert werden.
+Die automatisierten Tests prüfen den lokalen Dateisystemwechsel und seine Fehlerpfade sowie das Produktionspaket. Zusätzlich wurde die erfolgreiche Aktivierung über Plesk im Netcup-Chroot mit anschließender Prüfung über Web-PHP bestätigt. Ein fehlgeschlagenes Deployment mit Rollback wurde auf dem Live-Hosting nicht absichtlich ausgelöst; diese Fehlerpfade werden lokal getestet.

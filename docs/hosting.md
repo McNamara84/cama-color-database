@@ -1,29 +1,41 @@
 # Hostingabgleich: Netcup Webhosting 2000
 
-Stand: 15. November 2026. Der Nutzer bestätigt die eingerichtete Subdomain `cama.cats4future.de`, verfügbaren SSH-Zugang und PHP 8.5. Der Screenshot zeigt die Plesk-Git-Anbindung und den bisherigen Zielpfad `/cama.cats4future.de/httpdocs`. Eine technische Prüfung auf dem Hosting steht noch aus; die lokale Referenz ist deshalb **keine vollständig bestätigte Produktionskonfiguration**.
+Stand: 15. November 2026. Das vorhandene Webhosting 2000 wurde über den bereitgestellten SSH-Zugang geprüft. Im SSH-Chroot ist das Benutzerverzeichnis `/`; die Anwendung liegt unter `/cama.cats4future.de`. Web-PHP sieht dieselben Dateien unter `/var/www/vhosts/hosting128274.a2fdf.netcup.net/cama.cats4future.de`. Zugangsdaten stehen ausschließlich in der ignorierten lokalen `.env` beziehungsweise in `shared/.env` auf dem Hosting.
 
 | Merkmal | Lokale Referenz / Anforderung | Vorhandenes Paket |
 | --- | --- | --- |
-| Tarifgeneration | Webhosting 2000 | Offen |
-| PHP | 8.5.12; Composer-Plattform 8.5.0 | PHP 8.5 verfügbar, Patchstand offen |
-| CLI | Passende PHP-8.5-Version, 64 Bit, absoluter Pfad | Offen |
-| Erweiterungen | PDO, pdo_mysql, mbstring, intl, session; Composer prüft weitere transitive Anforderungen | Offen |
-| Datenbank | MariaDB 10.11.19, InnoDB, utf8mb4_unicode_ci | Typ und Version offen |
-| SQL-Modus | STRICT_TRANS_TABLES, ERROR_FOR_DIVISION_BY_ZERO, NO_ENGINE_SUBSTITUTION | Offen |
+| Tarifgeneration | Webhosting 2000 | Laut Nutzer Webhosting 2000; genaue Tarifgeneration nicht über SSH ermittelbar |
+| PHP | 8.5.12; Composer-Plattform 8.5.0 | CLI und Web-PHP 8.5.12 bestätigt, Web-SAPI `cgi-fcgi` |
+| CLI | Passende PHP-8.5-Version, 64 Bit, absoluter Pfad | `/usr/local/php85/bin/php`; 64-Bit-Plattformprüfung erfolgreich |
+| Erweiterungen | PDO, pdo_mysql, mbstring, intl, session; Composer prüft weitere transitive Anforderungen | Vorhanden; zusätzlich OpenSSL und Zip bestätigt; Produktionspaket besteht Composer-Plattformprüfung |
+| Datenbank | MariaDB 10.11.19, InnoDB, utf8mb4_unicode_ci | **MySQL 8.4.13**; zuvor leere CAMA-Datenbank auf `utf8mb4` / `utf8mb4_unicode_ci` eingestellt |
+| SQL-Modus | STRICT_TRANS_TABLES, ERROR_FOR_DIVISION_BY_ZERO, NO_ENGINE_SUBSTITUTION | Serverstandard enthält `IGNORE_SPACE,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION`; kein globaler Strict-Modus |
 | Speicher/Laufzeit | PHP lokal 256 MiB / 30 s | Offen |
-| Document-Root | Nur `current/public` | Konfigurierbarkeit und Chroot-Pfad offen |
-| Routing | Apache-Rewrite / `.htaccess` | Offen |
-| Git-Anbindung | Plesk zieht den fertigen Branch `deploy` von GitHub | Dialog im Panel vorhanden; Deploy-Key und Webhook einzurichten |
-| SSH | Optional zur Diagnose; kein CI-Upload | Zugang laut Nutzer eingerichtet |
-| Deploymentwerkzeuge | PHP-8.5-CLI mit proc_open, flock, symlink und rename; zusätzliche Plesk-Bereitstellungsaktionen | Auf echtem Hosting zu prüfen |
-| HTTP-Prüfung vom Hosting | HTTPS-Dateizugriff über PHP (`allow_url_fopen`), funktionierende CA-Zertifikate | Offen |
-| Releasewechsel | Atomarer Symlinkwechsel; Web-PHP/OPcache erkennt neues Release | Offen |
-| Persistente Dateien | `shared/.env`, schreibbares `shared/var` außerhalb der öffentlichen Wurzel | Offen |
-| Datenbankrechte | DML für Anwendung; Schema-Rechte für Migrationen, soweit getrennt verfügbar | Offen |
-| Zieladresse | Eigene Domain/Subdomain, HTTPS, Betrieb am Domain-Wurzelpfad | `cama.cats4future.de` eingerichtet; HTTPS-Aufruf noch zu prüfen |
-| Backup/Restore | Eigener geprüfter Export-/Restoreablauf | Offen |
+| Document-Root | Nur `current/public` | Panel bleibt auf `httpdocs`; `httpdocs -> current/public` eingerichtet, alte Inhalte privat gesichert |
+| Routing | Apache-Rewrite / `.htaccess` | Startseite, `/health` und CSS über HTTPS erfolgreich; private Pfade liefern 403/404; POST wird mit 405 abgewiesen |
+| Git-Anbindung | Plesk zieht den fertigen Branch `deploy` von GitHub | Repository `cama-color-database.git`, Branch `deploy`, Webhook und automatische Bereitstellungsaktion durch erfolgreichen CI-Lauf samt anschließender Aktivierung bestätigt |
+| SSH | Optional zur Diagnose; kein CI-Upload | Anmeldung erfolgreich, Netcup-Hostschlüssel lokal für die Sitzung festgehalten |
+| Deploymentwerkzeuge | PHP-8.5-CLI mit proc_open, flock, symlink und rename; zusätzliche Plesk-Bereitstellungsaktionen | CLI-Funktionen vorhanden; Git und tar vorhanden; Releaseimport samt Dateiprüfsummen erfolgreich |
+| HTTP-Prüfung vom Hosting | HTTPS-Dateizugriff über PHP (`allow_url_fopen`), funktionierende CA-Zertifikate | PHP-CLI erreicht die eigene Subdomain per HTTPS mit eingeschalteter Zertifikatsprüfung |
+| Releasewechsel | Atomarer Symlinkwechsel; Web-PHP/OPcache erkennt neues Release | Aktivierung erfolgreich; CLI- und externe HTTPS-Prüfung bestätigen Commit `2977ff838b730ed69e59abca78da8edf825362a2` |
+| Persistente Dateien | `shared/.env`, schreibbares `shared/var` außerhalb der öffentlichen Wurzel | Konfiguration mit Modus `0600` eingerichtet; gemeinsame Laufzeitverzeichnisse angelegt und CLI-Diagnose erfolgreich |
+| Datenbankrechte | DML für Anwendung; Schema-Rechte für Migrationen, soweit getrennt verfügbar | Bereitgestellter Benutzer für Anwendung und Migrationen; eigene Datenbank, Unicode/InnoDB/NotORM/Commit/Rollback anhand temporärer Tabelle geprüft |
+| Zieladresse | Eigene Domain/Subdomain, HTTPS, Betrieb am Domain-Wurzelpfad | **https://cama.cats4future.de** ist mit der Anwendung erreichbar |
+| Backup/Restore | Eigener geprüfter Export-/Restoreablauf | Frühere Webdateien vor Umstellung gesichert; Datenbank-Restore noch nicht erprobt |
 
 Die aktuelle [Netcup-Produktbeschreibung](https://www.netcup.com/de/hosting/webhosting/webhosting-2000-nue) bestätigt grundsätzlich PHP, SSH und einen anpassbaren Document-Root. Diese Angaben ersetzen den Abgleich des vorhandenen Vertrags nicht.
+
+[CI-Lauf 43728179882](https://github.com/McNamara84/cama-color-database/actions/runs/43728179882) wurde manuell auf `main` gestartet und bestand sämtliche Prüfungen einschließlich Veröffentlichung und Plesk-Benachrichtigung. Der Webhook-Schritt begann am 15. November 2026 um 15:10:43 UTC; der `current`-Link wurde auf dem Hosting um 15:10:46 UTC erneut aktiviert. Damit ist die tatsächliche Ausführung der Plesk-Aktion auch bei diesem bereits zuvor installierten Release nachgewiesen. Anschließend bestätigten externe HTTPS-Aufrufe die erwartete Release-ID, Startseite und CSS sowie den gesperrten Zugriff auf Konfiguration und interne PHP-Dateien.
+
+Die lokale MariaDB-Referenz ist nicht identisch mit dem MySQL-Hosting. Die realen Hostingprüfungen bestätigen die Grundfunktionen, ersetzen aber keinen vollständigen CI-Lauf auf MySQL. Vor Fachmigrationen und schreibenden Modulen sind SQL-Modus und Datenbankreferenz abzugleichen; der Strict-Modus war beim einmaligen Längentest nur für dessen eigene Datenbankverbindung gesetzt. Es wurden keine globalen Servereinstellungen geändert.
+
+Der veraltete GitHub-RSA-Hostschlüssel in `/.ssh/git_known_hosts` wurde nach Sicherung durch die [von GitHub offiziell veröffentlichten Hostschlüssel](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints) ersetzt. Der anschließende Git-Lesezugriff mit eingeschalteter Hostschlüsselprüfung war erfolgreich. Der frühere Fehler `REMOTE HOST IDENTIFICATION HAS CHANGED` ist damit behoben.
+
+## Panel-Einstellungen
+
+Bei `open_basedir` stellt dieses Paket zwei Optionen bereit. Der Eintrag **beginnend mit `{WEBSPACEROOT}`** wurde gewählt und seine Wirkung über Web-PHP bestätigt. Der Standard beginnend mit `{DOCROOT}` verhindert den Zugriff auf Anwendungscode und Konfiguration außerhalb des öffentlichen Ordners. Eine freie Pfadangabe bietet dieses Panel nicht an; ein Test mit `.user.ini` konnte die erzwungene Einstellung nicht überschreiben. Temporäre PHP-Prüfdateien wurden anschließend entfernt.
+
+Plesk-Git-Registrierung, Branchwahl, zusätzliche Bereitstellungsaktionen und Webhook-URL werden vom Panel verwaltet und sind über diesen eingeschränkten SSH-Zugang nicht administrierbar. Die [Deploymentanleitung](deployment.md) enthält die einzutragenden Werte.
 
 ## Prüfung vor Aktivierung
 

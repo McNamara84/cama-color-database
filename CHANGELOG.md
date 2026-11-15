@@ -4,6 +4,8 @@
 
 ### Geändert – 2026-11-15
 
+- Anwendung auf dem vorhandenen Netcup Webhosting 2000 unter `https://cama.cats4future.de` in Betrieb genommen; erfolgreiche CI, Plesk-Webhook, automatische Aktivierung und anschließende HTTPS-Prüfung bestätigt.
+- Hostingbefund und Einrichtungsanleitung aktualisiert: PHP 8.5.12, MySQL 8.4.13 mit utf8mb4, gemeinsame private Konfiguration, öffentlicher Symlink und erforderliche `open_basedir`-Dropdownauswahl. Abweichungen zur lokalen MariaDB und noch ausstehender Datenbank-Restoretest sind dokumentiert.
 - Deployment über die Git-Anbindung im Netcup-/Plesk-Panel: Erfolgreich geprüfte Pushes und PR-Merges nach `main` veröffentlichen das fertige Produktionspaket auf `deploy`; offene PRs führen ausschließlich CI-Prüfungen aus.
 - Plesk-Pull per HTTPS-Webhook mit anschließender Prüfung der tatsächlich ausgelieferten Release-ID; Repository-Secret statt SSH-Zugangsdaten in GitHub Actions. Ein manueller CI-Lauf auf `main` ermöglicht Wiederholungen.
 - Schutz vor überholten CI-Läufen, Deployment ohne Force-Push, SHA-256-Manifest und atomarer Import aus dem Plesk-Zielordner vor dem bestehenden Releasewechsel mit Rollback.

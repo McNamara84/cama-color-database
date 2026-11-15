@@ -8,16 +8,19 @@ Voraussetzungen: Git, Docker Engine/Docker Desktop mit Docker Compose und eine P
 
 ```sh
 bin/setup
+# Jetzt ADMIN_EMAIL und ADMIN_PASSWORD (15–128 Zeichen) in .env eintragen.
 docker compose build php test
 docker compose run --rm --no-deps php composer install
 docker compose up -d
-docker compose run --rm php composer db:migrate
+docker compose run --rm php composer app:install
 docker compose run --rm php php bin/doctor.php
 ```
 
 Die Anwendung steht unter **http://127.0.0.1:8080**, phpMyAdmin unter **http://127.0.0.1:8081** bereit. Falls diese Ports belegt sind, `WEB_PORT` und `PMA_PORT` in `.env` ändern. Beide HTTP-Dienste sind ausschließlich an Loopback gebunden; die Datenbank veröffentlicht keinen Port.
 
 `bin/setup` erzeugt einmalig `.env` mit zufälligen lokalen Passwörtern und den lokalen Benutzer-/Gruppen-IDs. Eine vorhandene `.env` bleibt erhalten. Unter macOS/WSL bei Bedarf `LOCAL_UID` und `LOCAL_GID` anpassen.
+
+Unter **Anmelden** die selbst konfigurierten Adminzugänge verwenden und beim ersten Login das Startpasswort ändern. Danach kann ausschließlich dieser Admin unter **Accounts** weitere Benutzer anlegen. Es gibt keine Selbstregistrierung. Wiederholte Installation erhält bestehende Zugänge; Einzelheiten stehen unter [Anmeldung und Accounts](docs/accounts.md).
 
 Für phpMyAdmin stehen diese lokalen Konten zur Verfügung; die Passwörter stehen ausschließlich in `.env`:
 
@@ -37,6 +40,8 @@ docker compose run --rm test composer test:coverage
 docker compose run --rm test php bin/check-coverage.php
 docker compose run --rm test sh tests/smoke.sh
 docker compose run --rm test php tests/phpmyadmin-smoke.php
+docker compose run --rm test php tests/auth-smoke.php
+docker compose -f compose.yaml -f compose.mysql.yaml run --rm test composer test
 docker compose run --rm --no-deps php composer audit
 ```
 
@@ -55,16 +60,16 @@ docker compose down
 
 ## Umfang und Weiterentwicklung
 
-Enthalten sind eine Startseite, Health-Endpunkt, sichere Fehlerseiten, zentrale Konfiguration, begrenzte Logs, Datenbankanbindung, Migrationen, Validierungsbausteine und Docker/CI/CD. Schreibende Routen sind standardmäßig gesperrt. Login, Rollenverwaltung und Fachmodule werden später ergänzt; die geplante Oberfläche ist öffentlich lesbar und durch angemeldete Redakteure/Administratoren bearbeitbar.
+Enthalten sind Startseite, Health-Endpunkt, Login/Logout, eigener Passwortwechsel, Admin-Ersteinrichtung und ausschließlich dem Admin zugängliche Accountanlage sowie sichere Fehlerseiten, Konfiguration, Logs, Datenbankanbindung, Migrationen, Validierung und Docker/CI/CD. Neue schreibende Routen bleiben standardmäßig gesperrt. Fachmodule und weitere Rollen werden später ergänzt; die Oberfläche bleibt für spätere Datensätze öffentlich lesbar, während Accounts geschützt sind.
 
 Twig bildet die Oberfläche. HTMX wird erst mit der ersten dynamischen Fachfunktion eingebunden, einschließlich Fehlerdarstellung für HTTP 422 und normaler HTML-Fallbacks. Die fachlichen Tabellen und die Suche mit mehr als 100.000 Einträgen bleiben einem eigenen Entwicklungsschritt vorbehalten.
 
-Die lokale Laufzeit verwendet **PHP 8.5.12 und MariaDB 10.11.19**. Auf Netcup wurden **PHP 8.5.12 und MySQL 8.4.13** bestätigt. Datenbankverbindung, Unicode, NotORM und Transaktionen wurden dort mit temporären Testdaten geprüft; die lokale Datenbankreferenz und der Server-SQL-Modus sind noch nicht identisch. Die Einzelheiten stehen im [Hostingabgleich](docs/hosting.md). Offizielle Container werden per Digest fixiert; Composer-Abhängigkeiten sind in `composer.lock` festgeschrieben.
+Die lokale Laufzeit verwendet **PHP 8.5.12 und MariaDB 10.11.19**. Auf Netcup wurden **PHP 8.5.12 und MySQL 8.4.13** bestätigt. CI prüft zusätzlich MySQL 8.4.13 in einem getrennten Docker-Projekt; die Anwendung setzt den strikten SQL-Modus pro Datenbankverbindung. Die Einzelheiten stehen im [Hostingabgleich](docs/hosting.md). Offizielle Container werden per Digest fixiert; Composer-Abhängigkeiten sind in `composer.lock` festgeschrieben.
 
 Die Bereitstellung für **https://cama.cats4future.de** verwendet die Git-Anbindung des Netcup-/Plesk-Panels. Nach erfolgreichen Tests eines Pushes oder PR-Merges nach `main` schreibt CI das fertige Paket samt Produktionsabhängigkeiten auf den Branch `deploy` und benachrichtigt Plesk. Offene PRs veröffentlichen nichts. Die einmalige Einrichtung und Freischaltung stehen in der [Deploymentanleitung](docs/deployment.md); ein Hosting-Upgrade ist dafür nicht vorgesehen.
 
 Die Anwendung ist auf dem vorhandenen Webhosting 2000 erreichbar. Die vollständige automatische Bereitstellung wurde am 15. November 2026 mit [CI-Lauf 43728179882](https://github.com/McNamara84/cama-color-database/actions/runs/43728179882) und anschließender HTTPS-Prüfung bestätigt.
 
-Weitere Dokumentation: [Entwicklung](docs/development.md), [Hostingabgleich](docs/hosting.md), [Deployment und Wiederherstellung](docs/deployment.md), [Changelog](CHANGELOG.md).
+Weitere Dokumentation: [Anmeldung und Accounts](docs/accounts.md), [Entwicklung](docs/development.md), [Hostingabgleich](docs/hosting.md), [Deployment und Wiederherstellung](docs/deployment.md), [Changelog](CHANGELOG.md).
 
 Lizenz: [GPL-3.0](LICENSE).

@@ -6,5 +6,7 @@ parameters:
         - bin/activate.php
         - bin/plesk-deploy.php
         - bin/check-coverage.php
+        - bin/install.php
+        - migrations
         - phinx.php
     tmpDir: var/phpstan

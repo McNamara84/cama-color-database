@@ -14,6 +14,21 @@ use Symfony\Component\Console\Output\NullOutput;
 
 final class MigrationTest extends TestCase
 {
+    public function testAccountSchemaCanBeCreatedRepeatedAndRolledBack(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $manager = new Manager(new Config(require $root . '/phinx.php'), new ArrayInput([]), new NullOutput());
+        $pdo = (new Database(Settings::load($root)->database))->connection();
+        $manager->rollback('test', 0);
+        self::assertSame([], $pdo->query("SHOW TABLES LIKE 'users'")->fetchAll());
+        self::assertSame([], $pdo->query("SHOW TABLES LIKE 'login_attempts'")->fetchAll());
+        $manager->migrate('test');
+        $manager->migrate('test');
+        self::assertSame(1, (int) $pdo->query('SELECT COUNT(*) FROM phinxlog')->fetchColumn());
+        self::assertSame('NO', $pdo->query("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'password_hash'")->fetchColumn());
+        self::assertSame('NO', $pdo->query("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_attempts' AND COLUMN_NAME = 'bucket'")->fetchColumn());
+    }
+
     public function testMigrationAndRepeatedRunAndRollback(): void
     {
         $root = dirname(__DIR__, 2);

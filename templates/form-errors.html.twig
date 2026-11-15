@@ -1,0 +1,5 @@
+{% if message %}<p class="alert" role="alert">{{ message }}</p>{% endif %}
+{% if errors %}
+{% set labels = {'[email]': 'E-Mail-Adresse', '[name]': 'Name', '[password]': 'Passwort', '[password_confirmation]': 'Passwortwiederholung', '[current_password]': 'Aktuelles Passwort'} %}
+<div class="alert" role="alert"><p>Bitte prüfe deine Eingaben:</p><ul>{% for error in errors %}<li>{% if labels[error.field] is defined %}{{ labels[error.field] }}: {% endif %}{{ error.message }}</li>{% endfor %}</ul></div>
+{% endif %}

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Behoben – 2026-11-15
+
+- Passwortfelder bei Anmeldung, Passwortwechsel und Accountanlage kürzen gültige Unicode-Passwörter nicht mehr durch das HTML-`maxlength`; die serverseitige Grenze bleibt bei 128 Unicode-Zeichen.
+
+### Hinzugefügt – Accounts – 2026-11-15
+
+- Login und Logout mit CSRF-Schutz, erneuerten Session-IDs, Sitzungsablauf und Anmeldebegrenzung; Startseite bleibt öffentlich, Accountdaten sind geschützt.
+- Einmalige automatische Admin-Erstellung aus privater Konfiguration, ausschließlich durch diesen Admin mögliche Accountanlage und verpflichtender Wechsel von Startpasswörtern; keine Selbstregistrierung.
+- Eigener Passwortwechsel, Argon2id-Hashes und Ungültigkeit älterer Sitzungen nach Passwortänderungen; wiederholte Installation überschreibt keine Zugangsdaten.
+- Accountmigrationen, strikter SQL-Modus pro Verbindung, zusätzliche CI-Tests auf MySQL 8.4.13 sowie Integrations- und HTTP-Tests für Berechtigungen, Cookies, Installation und Passwortabläufe.
+- Anleitung zur lokalen Ersteinrichtung und kontrollierten ersten Accountmigration auf Netcup; Adminprüfung ohne Schemaänderung als Deployment-Voraussetzung.
+
 ### Geändert – 2026-11-15
 
 - Anwendung auf dem vorhandenen Netcup Webhosting 2000 unter `https://cama.cats4future.de` in Betrieb genommen; erfolgreiche CI, Plesk-Webhook, automatische Aktivierung und anschließende HTTPS-Prüfung bestätigt.

@@ -39,6 +39,9 @@ jobs:
           docker compose up -d web phpmyadmin
           docker compose run --rm test sh tests/smoke.sh
           docker compose run --rm test php tests/phpmyadmin-smoke.php
+          docker compose run --rm test php tests/auth-smoke.php
+      - name: Check MySQL hosting compatibility
+        run: docker compose -f compose.yaml -f compose.mysql.yaml run --rm test composer test
       - name: Build and test the production package
         env:
           RELEASE_SHA: ${{ steps.identity.outputs.sha }}
@@ -68,7 +71,9 @@ jobs:
           retention-days: 14
       - name: Stop project containers
         if: always()
-        run: docker compose down
+        run: |
+          docker compose down
+          docker compose -f compose.yaml -f compose.mysql.yaml down
   deploy:
     needs: check
     if: >-

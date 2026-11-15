@@ -3,7 +3,7 @@
         'name' => 'cama/color-database',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '2977ff838b730ed69e59abca78da8edf825362a2',
+        'reference' => 'c5c96f4db639da336a1fc34a67cf6e00f3a73299',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -67,7 +67,7 @@
         'cama/color-database' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '2977ff838b730ed69e59abca78da8edf825362a2',
+            'reference' => 'c5c96f4db639da336a1fc34a67cf6e00f3a73299',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

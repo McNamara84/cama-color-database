@@ -1,0 +1,10 @@
+{% extends 'layout.html.twig' %}
+{% block title %}{{ status }} · {{ app_name }}{% endblock %}
+{% block content %}
+<p class="eyebrow">Fehler {{ status }}</p>
+<h1>{% if status == 404 %}Hier ist noch nichts.{% elseif status == 403 %}Zugriff nicht möglich.{% elseif status == 405 %}Diese Anfrage ist nicht möglich.{% else %}Das hat leider nicht geklappt.{% endif %}</h1>
+<p class="intro">{% if status == 404 %}Die angeforderte Seite wurde nicht gefunden.{% else %}Bitte versuche es später erneut oder kehre zur Startseite zurück.{% endif %}</p>
+<a class="back" href="/">Zur Startseite</a>
+<p class="note">Anfrage: {{ request_id }}</p>
+{% if detail %}<pre>{{ detail }}</pre>{% endif %}
+{% endblock %}

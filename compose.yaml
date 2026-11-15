@@ -1,0 +1,82 @@
+name: cama-color-database
+x-php: &php
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+    target: development
+  user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+  working_dir: /app
+  volumes:
+    - .:/app
+  env_file: .env
+  environment:
+    XDEBUG_MODE: ${XDEBUG_MODE:-off}
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  php:
+    <<: *php
+  web:
+    image: httpd:2.4-bookworm@sha256:fbc12199ccad031d8047e9c789d65aceee2d14f99ba90664cd3a3996867a5582
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    volumes:
+      - ./public:/app/public:ro
+      - ./docker/web/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    depends_on:
+      - php
+  db:
+    image: mariadb:10.11@sha256:7d829180b5b2a9ba74f6242876ab401a0d7dd338a807e522ef92bc9698760f20
+    environment:
+      MARIADB_DATABASE: cama
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Run bin/setup first}
+      DB_PASSWORD: ${DB_PASSWORD:?Run bin/setup first}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:?Run bin/setup first}
+      DB_TEST_PASSWORD: ${DB_TEST_PASSWORD:?Run bin/setup first}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"]
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/db/init.sh:/docker-entrypoint-initdb.d/01-cama.sh:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  phpmyadmin:
+    image: phpmyadmin:5-apache@sha256:e4b3eb5305cd42d21512bb55def2bab52625d56df927ad4ee1864a9354c84d40
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - "127.0.0.1:${PMA_PORT:-8081}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+  test:
+    <<: *php
+    profiles: [tools]
+    environment:
+      APP_ENV: test
+      APP_DEBUG: "false"
+      APP_RUNTIME_DIR: /app/var/test
+      DB_HOST: db
+      DB_NAME: cama_test
+      DB_USER: cama_test
+      DB_PASSWORD: ${DB_TEST_PASSWORD:?Run bin/setup first}
+      DB_MIGRATION_USER: cama_test
+      DB_MIGRATION_PASSWORD: ${DB_TEST_PASSWORD:?Run bin/setup first}
+      XDEBUG_MODE: coverage
+    command: [composer, test:coverage]
+  package-test:
+    <<: *php
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: runtime
+    command: [sh, tests/package-smoke.sh]
+
+volumes:
+  db-data:

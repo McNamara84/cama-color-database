@@ -1,0 +1,9 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - bin/doctor.php
+        - bin/activate.php
+        - bin/check-coverage.php
+        - phinx.php
+    tmpDir: var/phpstan

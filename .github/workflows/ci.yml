@@ -1,0 +1,77 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+    outputs:
+      sha:
+        description: Tested commit
+        value: ${{ jobs.check.outputs.sha }}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      sha: ${{ steps.identity.outputs.sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - id: identity
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Prepare Docker environment
+        run: |
+          bin/setup
+          docker compose build php test
+          docker compose run --rm --no-deps php composer install --no-interaction --prefer-dist --no-progress
+      - name: Validate, analyse and test
+        run: |
+          docker compose run --rm test sh -ec '
+            composer validate --strict
+            composer lint
+            composer analyse
+            composer audit
+            composer test:coverage
+            php bin/check-coverage.php
+          '
+      - name: Check Apache and FPM
+        run: |
+          docker compose up -d web phpmyadmin
+          docker compose run --rm test sh tests/smoke.sh
+          docker compose run --rm test php tests/phpmyadmin-smoke.php
+      - name: Build and test the production package
+        env:
+          RELEASE_SHA: ${{ steps.identity.outputs.sha }}
+        run: |
+          docker compose run --rm php sh bin/package "$RELEASE_SHA"
+          docker compose run --rm --build package-test
+          docker compose run --rm test bash tests/transport-smoke.sh
+      - name: Preserve coverage
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: coverage-${{ steps.identity.outputs.sha }}
+          path: |
+            build/coverage.xml
+            build/coverage/
+          retention-days: 14
+      - name: Preserve verified release
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ steps.identity.outputs.sha }}
+          path: |
+            build/release.tar.gz
+            build/release.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Stop project containers
+        if: always()
+        run: docker compose down
